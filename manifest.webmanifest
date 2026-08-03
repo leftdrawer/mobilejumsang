@@ -1,0 +1,17 @@
+{
+  "name": "휴대점상",
+  "short_name": "휴대점상",
+  "description": "오방기·칠방기, 엽전, 요미산을 담은 휴대 점상",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#0c0805",
+  "theme_color": "#0c0805",
+  "lang": "ko",
+  "icons": [
+    { "src": "icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "icon-512.png", "sizes": "512x512", "type": "image/png" },
+    { "src": "icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}
