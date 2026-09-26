@@ -79,6 +79,11 @@
   .verdict.quiet{padding:calc(var(--u)*2.2) calc(var(--w)*2.6)}
   .verdict.quiet::before,.verdict.quiet::after{display:none}
   .verdict.quiet .b{margin-top:0;color:#b79f74;font-size:calc(var(--u)*2.8)}
+  .verdict .yjhex{display:flex;flex-direction:column;align-items:center;gap:calc(var(--u)*.5);
+    margin-bottom:calc(var(--u)*1.4)}
+  .verdict .yjline{font-size:calc(var(--u)*5.2);line-height:1;color:#f0e0b4;
+    letter-spacing:0;font-family:serif}
+  .verdict .yjnote{color:#8a7454;font-size:calc(var(--u)*2.2);margin-top:calc(var(--u)*1)}
   .head{position:absolute;top:0;left:0;right:0;text-align:center;
     padding-top:calc(var(--u)*7);padding-bottom:calc(var(--u)*3);
     background:linear-gradient(180deg,rgba(8,4,2,.86) 0%,rgba(8,4,2,.62) 55%,rgba(8,4,2,0) 100%)}
@@ -4666,8 +4671,8 @@ function clothGeo(){
 }
 
 /* ══ 장면 그룹 ══ */
-const gHome=new THREE.Group(), gFlag=new THREE.Group(), gCoin=new THREE.Group(), gRice=new THREE.Group();
-scene.add(gHome,gFlag,gCoin,gRice);
+const gHome=new THREE.Group(), gFlag=new THREE.Group(), gCoin=new THREE.Group(), gRice=new THREE.Group(), gYijing=new THREE.Group();
+scene.add(gHome,gFlag,gCoin,gRice,gYijing);
 
 /* 점상 (엽전용) */
 const trayMat=new THREE.MeshStandardMaterial({map:T(woodTex(1024,600,[52,29,13],[132,88,46],23),true),roughness:.68,metalness:.03});
@@ -4864,16 +4869,181 @@ const CAMS={
   home:{pos:[0,0.375,0.335],look:[0,0,0.004]},
   flag:{pos:[0,0.60,1.02],look:[0,0.48,0]},
   coin:{pos:[0,0.205,0.138],look:[0,0,-0.002]},
-  rice:{pos:[0,0.175,0.118],look:[0,0,-0.002]}
+  rice:{pos:[0,0.175,0.118],look:[0,0,-0.002]},
+  yijing:{pos:[0,0.066,0.300],look:[0,0.052,0]}
 };
 let screen='home';
 function setScreen(s){
   screen=s;
   gHome.visible=(s==='home'); gFlag.visible=(s==='flag');
   gCoin.visible=(s==='coin'); gRice.visible=(s==='rice');
+  gYijing.visible=(s==='yijing');
   const c=CAMS[s];
   cam.position.set(...c.pos); cam.lookAt(...c.look);
   buildUI(); draw();
+}
+
+/* ══════════════════════════════════════════════════════════
+   주역괘 (yijing) — 독립 블록
+   세로 축에 막대 6개가 피젯처럼 돈다. 한 면은 양효(이어진 막대),
+   반대 면은 음효(가운데 갈라진 두 토막). 짚으면 각자 돌다 시간차로 멈춰
+   음/양이 정해지고, 아래(초효)→위(상효) 6효로 64괘를 읽는다. 동효 없음.
+   한자 괘명·풀이는 2단계에서 채운다(데이터 자리만 잡아 둠).
+   ══════════════════════════════════════════════════════════ */
+
+/* 팔괘: 3효(아래→위) 비트. 양=1, 음=0. 인덱스는 (하위비트=아래효) */
+// 트라이그램 코드(0~7) → 한글 이름. 비트: b0=아래효, b1=가운데, b2=위효
+const YJ_TRIGRAM=['곤','간','감','손','진','리','태','건'];
+//                 000  001  010  011  100  101  110  111  (아래→위 비트)
+// 64괘: key = 하괘코드*8 + 상괘코드 (둘 다 0~7). 값 = [KingWen번호, 한글괘명].
+// 한글 괘명은 은호당님 감수 대상(2단계). 한자·풀이는 아직 비움.
+const YJ64 = (()=>{
+  // King Wen 순서를 상/하괘 조합으로 정의한 표준 표.
+  // 각 항목: [상괘코드, 하괘코드, 번호, 한글이름]  (코드는 위 YJ_TRIGRAM 인덱스)
+  const T={건:7,태:6,리:5,진:4,손:3,감:2,간:1,곤:0};
+  const rows=[
+    ['건','건',1,'중천건'],['곤','곤',2,'중지곤'],['감','진',3,'수뢰둔'],['간','감',4,'산수몽'],
+    ['감','건',5,'수천수'],['건','감',6,'천수송'],['곤','감',7,'지수사'],['감','곤',8,'수지비'],
+    ['손','건',9,'풍천소축'],['건','태',10,'천택리'],['곤','건',11,'지천태'],['건','곤',12,'천지비'],
+    ['건','리',13,'천화동인'],['리','건',14,'화천대유'],['곤','간',15,'지산겸'],['진','곤',16,'뇌지예'],
+    ['태','진',17,'택뢰수'],['간','손',18,'산풍고'],['곤','태',19,'지택림'],['손','곤',20,'풍지관'],
+    ['리','진',21,'화뢰서합'],['간','리',22,'산화비'],['간','곤',23,'산지박'],['곤','진',24,'지뢰복'],
+    ['건','진',25,'천뢰무망'],['간','건',26,'산천대축'],['간','진',27,'산뢰이'],['태','손',28,'택풍대과'],
+    ['감','감',29,'중수감'],['리','리',30,'중화리'],['태','간',31,'택산함'],['진','손',32,'뇌풍항'],
+    ['건','간',33,'천산돈'],['진','건',34,'뇌천대장'],['리','곤',35,'화지진'],['곤','리',36,'지화명이'],
+    ['손','리',37,'풍화가인'],['리','태',38,'화택규'],['감','간',39,'수산건'],['진','감',40,'뇌수해'],
+    ['간','태',41,'산택손'],['손','진',42,'풍뢰익'],['태','건',43,'택천쾌'],['건','손',44,'천풍구'],
+    ['태','곤',45,'택지췌'],['곤','손',46,'지풍승'],['태','감',47,'택수곤'],['감','손',48,'수풍정'],
+    ['태','리',49,'택화혁'],['리','손',50,'화풍정'],['진','진',51,'중뢰진'],['간','간',52,'중산간'],
+    ['손','간',53,'풍산점'],['진','태',54,'뇌택귀매'],['진','리',55,'뇌화풍'],['리','간',56,'화산려'],
+    ['손','손',57,'중풍손'],['태','태',58,'중택태'],['손','감',59,'풍수환'],['감','태',60,'수택절'],
+    ['손','태',61,'풍택중부'],['진','간',62,'뇌산소과'],['감','리',63,'수화기제'],['리','감',64,'화수미제'],
+  ];
+  const m={};
+  rows.forEach(([up,lo,num,name])=>{ m[T[lo]*8+T[up]]=[num,name]; });
+  return m;
+})();
+
+/* 6효(아래→위, 양=1/음=0 배열) → 괘 정보 */
+function yjLookup(lines){
+  const lo=lines[0]|(lines[1]<<1)|(lines[2]<<2);   // 하괘 (초·2·3효)
+  const up=lines[3]|(lines[4]<<1)|(lines[5]<<2);    // 상괘 (4·5·상효)
+  const info=YJ64[lo*8+up]||[0,'?'];
+  return {num:info[0], name:info[1], lo:YJ_TRIGRAM[lo], up:YJ_TRIGRAM[up]};
+}
+
+/* 막대 앞/뒤 면 텍스처: 양효(이어진 막대) 또는 음효(갈라진 두 토막).
+   막대 면 비율(가로:세로 ≈ 6.8:1)에 맞춰 가로로 긴 캔버스에 그린다. */
+function yaoTex(isYang){
+  const W=512, H=80, c=document.createElement('canvas'); c.width=W; c.height=H;
+  const x=c.getContext('2d');
+  x.fillStyle='#efe3ca'; x.fillRect(0,0,W,H);        // 상아색 바탕
+  x.fillStyle='#1a120a';                              // 먹빛 효
+  const h=H*0.42, y=(H-h)/2, pad=W*0.06;
+  if(isYang){
+    x.fillRect(pad, y, W-pad*2, h);                  // 이어진 한 막대(양)
+  } else {
+    const gap=W*0.16, seg=(W-pad*2-gap)/2;
+    x.fillRect(pad, y, seg, h);
+    x.fillRect(pad+seg+gap, y, seg, h);              // 갈라진 두 토막(음)
+  }
+  const t=new THREE.CanvasTexture(c); t.colorSpace=THREE.SRGBColorSpace; t.anisotropy=8;
+  return t;
+}
+
+let yjSticks=[], yjLines=[0,0,0,0,0,0], yjMode='idle', yjResult=null, yjAnim=null;
+{
+  // 받침대(판 위 얹힘) + 세로 축 + 막대 6개
+  const woodDark=new THREE.MeshStandardMaterial({color:0x3a2414,roughness:.7,metalness:.05});
+  const AXIS_R=0.0035, BAR_W=0.095, BAR_H=0.016, BAR_T=0.006;
+  const GAP=0.00575;                                  // 막대 간 간격 (좁게)
+  const yTex=yaoTex(true), nTex=yaoTex(false);
+  const yMat=new THREE.MeshStandardMaterial({map:yTex,roughness:.62,metalness:.02});
+  const nMat=new THREE.MeshStandardMaterial({map:nTex,roughness:.62,metalness:.02});
+  const sideMat=new THREE.MeshStandardMaterial({color:0xd8c49a,roughness:.7});
+  // 막대 = 납작한 판이 수평으로 눕고 세로축(Y)에 꽂힌다. Y축으로 돌며
+  // 앞면(+Z)=양효, 뒷면(-Z)=음효. 면 순서 [+X,-X,+Y,-Y,+Z,-Z]
+  const barMat=[sideMat,sideMat,sideMat,sideMat,yMat,nMat];
+
+  // 축(세로 기둥): 화면에서 위로 선다
+  const axis=new THREE.Mesh(new THREE.CylinderGeometry(AXIS_R,AXIS_R*1.2,BAR_H*6+GAP*5+0.03,16),woodDark);
+  axis.position.y=(BAR_H*6+GAP*5)/2;
+  axis.castShadow=axis.receiveShadow=true;
+  gYijing.add(axis);
+  // 꼭지(위 마감)
+  const cap=new THREE.Mesh(new THREE.SphereGeometry(AXIS_R*1.8,16,12),
+    new THREE.MeshStandardMaterial({color:0xf2ead4,roughness:.5}));
+  cap.position.y=BAR_H*6+GAP*5+0.012; cap.castShadow=true; gYijing.add(cap);
+  // 밑받침
+  const base=new THREE.Mesh(new THREE.CylinderGeometry(0.020,0.024,0.010,20),woodDark);
+  base.position.y=0.005; base.castShadow=base.receiveShadow=true; gYijing.add(base);
+
+  const barGeo=new THREE.BoxGeometry(BAR_W,BAR_H,BAR_T);
+  for(let i=0;i<6;i++){
+    // 아래(초효)부터 위로 쌓는다
+    const y=BAR_H/2+0.012+i*(BAR_H+GAP);
+    const m=new THREE.Mesh(barGeo, barMat.map(x=>x));   // 면별 재질 배열 공유
+    m.position.set(0,y,0);
+    m.castShadow=m.receiveShadow=true;
+    gYijing.add(m);
+    yjSticks.push({mesh:m, idx:i, spin:0, target:0, stopping:false, stopped:false, t0:0});
+  }
+  gYijing.position.set(0,0,0.010);
+  gYijing.scale.setScalar(0.7);                       // 전체 70% 크기
+  gYijing.visible=false;
+}
+
+/* 진입: 대기 상태로 세팅 (여러 번 불러도 안전) */
+function startYijing(){
+  if(yjAnim){ cancelAnimationFrame(yjAnim); yjAnim=null; }
+  yjResult=null; yjMode='idle';
+  yjSticks.forEach(s=>{ s.spin=0; s.stopping=false; s.stopped=false;
+    s.mesh.rotation.y=0; });                          // 세로축 회전, 양효 면(앞)을 보이게 초기화
+  buildUI(); draw();
+}
+
+/* 짚으면 6개가 각자 세로축으로 빙글빙글 돌기 시작 (피젯) */
+function spinYijing(){
+  if(yjMode==='spin') return;
+  yjMode='spin'; yjResult=null;
+  const now=performance.now();
+  yjSticks.forEach((s,i)=>{
+    s.spin=(22+Math.random()*14)*(Math.random()<0.5?1:-1);  // 빠른 각속도, 방향도 무작위
+    s.stopping=false; s.stopped=false;
+    s.stopMs=700+i*220+Math.random()*350;             // 시간차로 멈추기 시작
+    s.target=(Math.random()<0.5)?0:1;                 // 0=양(앞면), 1=음(뒷면)
+    s.t0=now;
+  });
+  yjLast=now; buildUI(); yjLoop(now);
+}
+
+let yjLast=0;
+function yjLoop(now){
+  const dt=Math.min((now-yjLast)/1000,0.05); yjLast=now;
+  let allStopped=true;
+  for(const s of yjSticks){
+    if(s.stopped){ continue; }
+    allStopped=false;
+    const el=now-s.t0;
+    if(!s.stopping && el>=s.stopMs) s.stopping=true;
+    if(s.stopping){
+      // 세로축(Y) 목표 각도(양=0, 음=π)로 감속하며 안착
+      s.spin*=0.92;
+      const targetAng=s.target? Math.PI:0;
+      let a=s.mesh.rotation.y % (Math.PI*2); if(a<0)a+=Math.PI*2;
+      let diff=targetAng-a; while(diff>Math.PI)diff-=Math.PI*2; while(diff<-Math.PI)diff+=Math.PI*2;
+      s.mesh.rotation.y += diff*0.20 + s.spin*dt;
+      if(Math.abs(diff)<0.02 && Math.abs(s.spin)<0.5){
+        s.mesh.rotation.y=targetAng; s.stopped=true;
+        yjLines[s.idx]= s.target? 0:1;                // 양(앞,0°)→1, 음(뒤,π)→0
+      }
+    } else {
+      s.mesh.rotation.y += s.spin*dt;                 // 자유 회전 (세로축)
+    }
+  }
+  draw();
+  if(allStopped){ yjMode='done'; yjResult=yjLookup(yjLines); buildUI(); draw(); }
+  else yjAnim=requestAnimationFrame(yjLoop);
 }
 
 /* ══ 오방기 로직 (복원식) ══ */
@@ -5406,6 +5576,10 @@ addEventListener('pointerdown',e=>{
   if(screen==='coin'){
     if(mode==='hand') releaseCoins();
     else if(mode==='done') spawnCoins();
+    return;
+  }
+  if(screen==='yijing'){
+    if(yjMode==='idle'||yjMode==='done') spinYijing();   // 짚으면 돌린다 / 결과 뒤 다시
   }
 });
 
@@ -5490,6 +5664,23 @@ function buildUI(){
       else h+=`<div class="verdict on quiet"><div class="b">쌀알 ${rN}알</div></div>
           <div class="hint">점상을 짚으면 다시 뿌립니다</div>`;
     }
+  } else if(screen==='yijing'){
+    h=`<div class="bar"><div class="back" data-go="home">‹ 점상</div>
+       <div class="ttl">주역</div><div class="rt"></div></div>`;
+    if(yjMode==='idle') h+=`<div class="hint">점상을 짚어 괘를 얻으십시오</div>`;
+    else if(yjMode==='spin') h+=`<div class="hint">괘가 정해지는 중입니다</div>`;
+    else if(yjMode==='done' && yjResult){
+      // 괘상: 상효(위)→초효(아래) 순으로 세로 표시. yjLines 는 아래→위(초효=0)
+      const glyph=(v)=> v? '⚊':'⚋';               // 1=양, 0=음
+      const rows=[5,4,3,2,1,0].map(i=>`<div class="yjline">${glyph(yjLines[i])}</div>`).join('');
+      h+=`<div class="verdict on">
+            <div class="yjhex">${rows}</div>
+            <div class="a">${yjResult.name}</div>
+            <div class="b">제 ${yjResult.num} 괘 · ${yjResult.up}상 ${yjResult.lo}하</div>
+            <div class="b yjnote">— 풀이는 준비 중입니다 —</div>
+          </div>
+          <div class="hint">점상을 짚으면 다시 얻습니다</div>`;
+    }
   } else {
     h=`<div class="bar"><div class="back" data-go="home">‹ 점상</div>
        <div class="ttl">엽전</div><div class="rt"></div></div>`;
@@ -5568,7 +5759,7 @@ window.__clothKeys=()=>Object.keys(clothTex);
 window.__dbg={CLOTH,FLAGS,FLAGS7N,FLAGS7S,flagSetGet:()=>flagSet,backGlyph,COIN_BACK,CT,CTB,CG,flagUnit,flagUnit2,cam,THREE,VW:()=>VW,VH:()=>VH,silkThread,silkGrains,gMound,riceXZ:()=>rBodies.map(b=>{const t=b.translation();return [t.x,t.z];})};
 window.__tilts=()=>bodies.map(b=>Math.round(tiltOf(b.rotation())));
 window.__heights=()=>bodies.map(b=>Math.round(b.translation().y*10000)/10);
-window.__api={setScreen,drawFlags,flagPick,spawnCoins,releaseCoins,spawnRice,releaseRice,ricePick,
+window.__api={setScreen,drawFlags,flagPick,spawnCoins,releaseCoins,spawnRice,releaseRice,ricePick,startYijing,spinYijing,
   state:()=>({screen,mode,clean:cleanCount,faceAll,faceClean,flags:flagResults,rMode,rN,flyT:Math.round(flyT*100)/100,rFlyT:Math.round(rFlyT*100)/100,stillN,rStill,
     rGrains:rBodies.length,rVis:rMeshes.filter(m=>m.visible).length,rY:rBodies.map(x=>Math.round(x.translation().y*10000)/10)})};
 }   // ── 디버그 훅 끝 ──
