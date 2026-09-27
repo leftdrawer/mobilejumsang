@@ -5526,6 +5526,255 @@ function riceLoop(now){
   } else rAnim=requestAnimationFrame(riceLoop);
 }
 
+/* ═════════════════════════════════════════════════
+   대신칼 (sinkal) — 독립 블록 (Claude)
+   무쇠 대신칼 두 자루를 한 손에 쥐고 빙글빙글 위로 던진다. 두 자루는 함께 움직이므로
+   물리에서는 한 덩어리(묶음)로 다룬다. 떨어져 멈춘 뒤 칼끝이 저쪽(보는 사람 반대편)을
+   향했는지 이쪽을 향했는지를 본다. 풀이는 법식이 정해지면 넣는다.
+   술: 한지 가닥마다 끈 모형(Verlet)으로 따로 움직이고, 가닥이 받는 공기 저항을
+   고리 자리에 힘으로 되돌려 준다 → 무거운 날이 앞장서고 고리 쪽이 끌려온다(셔틀콕처럼).
+   칼 모양은 블렌더 장면(blender/home_scene.py)과 같은 치수: 날 21.5cm · 자루 7.5cm · 고리 2.2cm.
+   ══════════════════════════════════════════════════════════ */
+const gSinkal=new THREE.Group(); scene.add(gSinkal); gSinkal.visible=false;
+CAMS.sinkal={pos:[0,0.50,1.45],look:[0,0.36,-0.05]};   // 던지는 동안: 앞쪽 낮은 자리에서 솟았다 떨어지는 높이가 다 들게
+const skCamFrom=new THREE.Vector3(), skLookFrom=new THREE.Vector3(), skCamTo=new THREE.Vector3(), skLookTo=new THREE.Vector3(), skLookNow=new THREE.Vector3();
+const SK_DT=1/240;
+const SK_BL=0.215, SK_HL=0.075, SK_RR=0.0095;          // 날 길이, 자루 길이, 고리 바깥 반지름
+const SK_SEP=0.0135;                                   // 두 자루가 옆으로 떨어진 거리(칼 가운데 기준 ±)
+let skWorld=null, skBody=null, skMode='idle', skAnim=null, skLast=0, skAcc=0, skT=0, skReal=0, skStill=0;
+let skResult=null;                                     // {side:'저쪽'|'이쪽', deg}
+const skKnifeGrp=new THREE.Group(); gSinkal.add(skKnifeGrp);
+
+/* 방바닥: 콩기름 먹인 장판지 */
+{
+  const c=document.createElement('canvas'); c.width=c.height=512; const x=c.getContext('2d');
+  x.fillStyle='#4a2f14'; x.fillRect(0,0,512,512);
+  let s=11; const rnd=()=>{s=(s*16807)%2147483647; return s/2147483647;};
+  for(let i=0;i<2600;i++){ const a=rnd()*.10; x.fillStyle=`rgba(${rnd()<.5?30:120},${rnd()<.5?18:80},6,${a})`;
+    x.fillRect(rnd()*512,rnd()*512,2+rnd()*30,1+rnd()*3); }
+  x.strokeStyle='rgba(30,16,4,.16)'; x.lineWidth=1.5;               // 장판지 조각 이음매 (은은하게)
+  for(let k=0;k<=512;k+=128){ x.beginPath(); x.moveTo(k,0); x.lineTo(k,512); x.stroke();
+    x.beginPath(); x.moveTo(0,k+ (k%256?40:0)); x.lineTo(512,k+(k%256?40:0)); x.stroke(); }
+  const t=new THREE.CanvasTexture(c); t.colorSpace=THREE.SRGBColorSpace; t.wrapS=t.wrapT=THREE.RepeatWrapping; t.repeat.set(7,7);
+  const fg=new THREE.PlaneGeometry(6,6,48,48), fp=fg.attributes.position, col=[];
+  for(let i=0;i<fp.count;i++){ const r=Math.hypot(fp.getX(i),fp.getY(i)); const k=Math.max(0,1-Math.max(0,r-.45)/1.1); col.push(k,k,k); }  // 멀어질수록 어둠
+  fg.setAttribute('color',new THREE.Float32BufferAttribute(col,3));
+  const fl=new THREE.Mesh(fg,
+    new THREE.MeshStandardMaterial({map:t,vertexColors:true,roughness:.4,metalness:0,envMapIntensity:.45}));
+  fl.rotation.x=-Math.PI/2; fl.receiveShadow=true; gSinkal.add(fl);
+}
+
+/* 무쇠 대신칼 한 자루 (칼 로컬: +X 칼끝, 날은 XZ 평면, 날 끝선은 -Z) */
+const skIron=new THREE.MeshStandardMaterial({color:0x1d222a,metalness:.9,roughness:.32,envMapIntensity:1.6,side:THREE.DoubleSide});   // 검푸른 무쇠, 방 빛을 받아 윤이 돈다
+const skGround=new THREE.MeshStandardMaterial({color:0x9a9ea4,metalness:.85,roughness:.22,side:THREE.DoubleSide});
+function skKnifeMesh(){
+  const g=new THREE.Group();
+  // 날: 밑동 0.85cm → 칼끝 2.1cm 로 곧게 넓어지고, 칼끝은 등 쪽이 짧게 비스듬히 잘렸다
+  const W0=.0085, W1=.021, T=.0032, spine=x=>.0040+.0035*x/SK_BL, width=x=>W0+(W1-W0)*x/SK_BL;
+  const sh=new THREE.Shape();
+  sh.moveTo(0,spine(0)); sh.lineTo(SK_BL-.020,spine(SK_BL-.020)); sh.lineTo(SK_BL,spine(SK_BL)-width(SK_BL));
+  sh.lineTo(0,spine(0)-width(0)); sh.closePath();
+  const bg=new THREE.ExtrudeGeometry(sh,{depth:T*.6,bevelEnabled:true,bevelThickness:T*.2,bevelSize:.0012,bevelSegments:2,curveSegments:1});
+  bg.rotateX(Math.PI/2); bg.translate(0,T*.3,0);        // 모양의 y → -z, 두께는 y
+  const blade=new THREE.Mesh(bg,[skIron,skGround]);     // 앞뒤 면은 검푸른 쇠, 갈린 둘레는 밝게
+  blade.castShadow=blade.receiveShadow=true; g.add(blade);
+  // 자루: 납작한 쇠띠를 꼬았다. 고리 쪽은 세워져(π/2), 날 쪽은 눕혀져(5π) 이어진다
+  const N=90, SW=.0075, ST=.0030, yc=spine(0)-W0/2;
+  const pos=[], idxD=[], idxB=[];
+  for(let i=0;i<=N;i++){
+    const t=i/N, xx=-SK_HL*(1-t)+.004*t, e=Math.min(1,Math.max(0,(t-.05)/.9)), ee=e*e*(3-2*e);
+    const th=Math.PI/2+(5*Math.PI-Math.PI/2)*ee, c=Math.cos(th), s=Math.sin(th);
+    for(const [a,b] of [[-1,-1],[1,-1],[1,1],[-1,1]]){
+      const zz=a*SW/2, yy=b*ST/2;
+      pos.push(xx, zz*s+yy*c, -(yc+zz*c-yy*s));
+    }
+  }
+  for(let i=0;i<N;i++) for(let k=0;k<4;k++){
+    const k2=(k+1)%4, a=i*4+k, b=(i+1)*4+k, c=(i+1)*4+k2, d=i*4+k2;
+    (k===0||k===2?idxD:idxB).push(a,b,c,a,c,d);
+  }
+  const hg=new THREE.BufferGeometry(); hg.setAttribute('position',new THREE.Float32BufferAttribute(pos,3));
+  hg.setIndex(idxD.concat(idxB)); hg.addGroup(0,idxD.length,0); hg.addGroup(idxD.length,idxB.length,1);
+  hg.computeVertexNormals();
+  const handle=new THREE.Mesh(hg,[skIron,skGround]); handle.castShadow=true; g.add(handle);
+  // 고리: 쇠띠를 세워 만 것
+  const ring=new THREE.Mesh(new THREE.TorusGeometry(SK_RR-.0015,.0016,10,36),skIron);
+  ring.rotation.x=Math.PI/2; ring.scale.set(1,1,1.9); ring.position.set(-SK_HL-(SK_RR-.0015),0,-yc);
+  ring.castShadow=true; g.add(ring);
+  return g;
+}
+const SK_OFF=[-SK_SEP,SK_SEP];                        // 칼 로컬 Z(옆)로 두 자루를 나란히
+SK_OFF.forEach(z=>{ const k=skKnifeMesh(); k.position.z=z; skKnifeGrp.add(k); });
+const SK_RING_X=-SK_HL-2*(SK_RR-.0015)-.002;           // 술이 매달리는 고리 끝 (칼 로컬 x)
+
+/* 술: 가닥마다 Verlet 끈. 흰 한지를 병풍 접은 모양으로 그린다 */
+const SK_NS=7, SK_NP=10, SK_SEG=.024;                  // 칼마다 가닥 7개, 마디 10개, 마디 간격 2.4cm (≈ 22cm)
+const skPaper=new THREE.MeshStandardMaterial({color:0xd9d1bf,roughness:.86,side:THREE.DoubleSide});
+const skStrands=[];                                    // {knife, off:Vector3(칼 로컬), p:[], q:[](이전), w, amp, mesh}
+SK_OFF.forEach((z,ki)=>{
+  for(let s=0;s<SK_NS;s++){
+    const secs=SK_NP*2-1, geo=new THREE.BufferGeometry();
+    geo.setAttribute('position',new THREE.Float32BufferAttribute(new Float32Array(secs*2*3),3));
+    const idx=[]; for(let i=0;i<secs-1;i++){ const a=i*2; idx.push(a,a+1,a+3,a,a+3,a+2); }
+    geo.setIndex(idx);
+    const m=new THREE.Mesh(geo,skPaper); m.castShadow=true; m.receiveShadow=true; m.frustumCulled=false; gSinkal.add(m);
+    const a=s/SK_NS*6.283;
+    skStrands.push({ki, off:new THREE.Vector3(SK_RING_X,Math.sin(a)*.006,z+Math.cos(a)*.006),
+      p:[], q:[], w:.010+Math.random()*.004, amp:.003+Math.random()*.002, mesh:m,
+      drag:.955+Math.random()*.03,                                           // 가닥마다 공기 저항이 다르다
+      wind:new THREE.Vector3((Math.random()-.5)*1.4,0,(Math.random()-.5)*1.4)}); // 가닥마다 흔들리는 바람 (m/s²)
+  }
+});
+const _v1=new THREE.Vector3(), _v2=new THREE.Vector3(), _v3=new THREE.Vector3(), _up=new THREE.Vector3(0,1,0);
+function skAnchor(st,out){ return out.copy(st.off).applyMatrix4(skKnifeGrp.matrixWorld); }
+function skStrandsReset(){
+  skKnifeGrp.updateMatrixWorld(true);
+  for(const st of skStrands){
+    const a=skAnchor(st,new THREE.Vector3()); st.p=[]; st.q=[];
+    for(let i=0;i<SK_NP;i++){ const v=a.clone(); v.y-=i*SK_SEG; v.x+=(Math.random()-.5)*.006*i; v.z+=(Math.random()-.5)*.004*i; v.y=Math.max(v.y,.001);
+      st.p.push(v); st.q.push(v.clone()); }
+  }
+}
+// 한 번에 dt 만큼: 중력·공기 저항·마디 길이 유지·바닥. 끝점(고리)은 칼을 따라간다
+function skStrandsStep(dt,sub){
+  const h=dt/sub, g=-9.81*h*h, hh=h*h;
+  skKnifeGrp.updateMatrixWorld(true);
+  for(const st of skStrands){
+    const A=skAnchor(st,_v3);
+    for(let k=0;k<sub;k++){
+      st.p[0].copy(A); st.q[0].copy(A);
+      for(let i=1;i<SK_NP;i++){
+        const p=st.p[i], q=st.q[i];
+        const dr=st.drag, lift=i/SK_NP;                                // 종이는 공기 저항이 크다, 끝으로 갈수록 바람을 탄다
+        const vx=(p.x-q.x)*dr, vy=(p.y-q.y)*dr, vz=(p.z-q.z)*dr;
+        q.copy(p); p.x+=vx+st.wind.x*hh*lift; p.y+=vy+g; p.z+=vz+st.wind.z*hh*lift;
+      }
+      for(let it=0;it<6;it++){
+        for(let i=1;i<SK_NP;i++){
+          const a=st.p[i-1], b=st.p[i]; _v1.subVectors(b,a); const d=_v1.length()||1e-6, diff=(d-SK_SEG)/d;
+          if(i===1){ b.addScaledVector(_v1,-diff); }
+          else { a.addScaledVector(_v1,diff*.5); b.addScaledVector(_v1,-diff*.5); }
+        }
+        for(let i=1;i<SK_NP;i++){ const p=st.p[i];
+          if(p.y<.0008){ p.y=.0008; const q=st.q[i]; q.x+=(p.x-q.x)*.35; q.z+=(p.z-q.z)*.35; } }   // 바닥에 닿으면 미끄러지며 선다
+      }
+    }
+  }
+}
+function skStrandsDraw(){
+  for(const st of skStrands){
+    const arr=st.mesh.geometry.attributes.position.array; let o=0;
+    for(let i=0;i<SK_NP*2-1;i++){
+      const i0=Math.floor(i/2), i1=Math.min(i0+1,SK_NP-1);
+      const P=(i%2===0)? _v2.copy(st.p[i0]) : _v2.addVectors(st.p[i0],st.p[i1]).multiplyScalar(.5);
+      _v1.subVectors(st.p[i1],st.p[i0===i1?i0-1:i0]).normalize();         // 가닥 방향
+      _v3.crossVectors(_v1,_up); if(_v3.lengthSq()<1e-6) _v3.set(1,0,0); _v3.normalize();   // 폭 방향
+      if(i%2===1){ const n=new THREE.Vector3().crossVectors(_v3,_v1).normalize(); P.addScaledVector(n,st.amp*((i0%2)?1:-1)); }  // 병풍 접힘
+      arr[o++]=P.x-_v3.x*st.w/2; arr[o++]=P.y-_v3.y*st.w/2; arr[o++]=P.z-_v3.z*st.w/2;
+      arr[o++]=P.x+_v3.x*st.w/2; arr[o++]=P.y+_v3.y*st.w/2; arr[o++]=P.z+_v3.z*st.w/2;
+    }
+    st.mesh.geometry.attributes.position.needsUpdate=true; st.mesh.geometry.computeVertexNormals();
+  }
+}
+
+/* 쥔 자세: 칼끝이 위, 날 면이 보는 사람 쪽, 두 자루는 좌우로 나란히 */
+const SK_HOLD_POS=new THREE.Vector3(0,.30,.10);
+const SK_HOLD_Q=new THREE.Quaternion().setFromRotationMatrix(new THREE.Matrix4().makeBasis(
+  new THREE.Vector3(0,1,0), new THREE.Vector3(0,0,1), new THREE.Vector3(1,0,0)));   // 로컬 X→위, Y→이쪽, Z→오른쪽
+function skApplyPose(p,q){ skKnifeGrp.position.set(p.x,p.y,p.z); skKnifeGrp.quaternion.set(q.x,q.y,q.z,q.w); }
+
+function skBuildWorld(){
+  skWorld=new RAPIER.World({x:0,y:-9.81,z:0}); skWorld.timestep=SK_DT; skWorld.numSolverIterations=10;
+  const f=skWorld.createRigidBody(RAPIER.RigidBodyDesc.fixed());
+  skWorld.createCollider(RAPIER.ColliderDesc.cuboid(2,.05,2).setTranslation(0,-.05,0).setFriction(.55).setRestitution(.22),f);
+  const b=skWorld.createRigidBody(RAPIER.RigidBodyDesc.dynamic()
+    .setTranslation(SK_HOLD_POS.x,SK_HOLD_POS.y,SK_HOLD_POS.z)
+    .setRotation({x:SK_HOLD_Q.x,y:SK_HOLD_Q.y,z:SK_HOLD_Q.z,w:SK_HOLD_Q.w})
+    .setLinearDamping(.04).setAngularDamping(.08).setCcdEnabled(true));
+  // 두 자루를 한 덩어리로: 날·자루·고리를 칼마다 상자로 (무쇠 7800kg/m³)
+  for(const z of SK_OFF){
+    skWorld.createCollider(RAPIER.ColliderDesc.cuboid(SK_BL/2,.0016,.0075).setTranslation(SK_BL/2,0,z-.0005)
+      .setDensity(7800).setFriction(.5).setRestitution(.22),b);
+    skWorld.createCollider(RAPIER.ColliderDesc.cuboid(SK_HL/2,.0035,.0035).setTranslation(-SK_HL/2,0,z)
+      .setDensity(7800).setFriction(.5).setRestitution(.2),b);
+    skWorld.createCollider(RAPIER.ColliderDesc.cuboid(SK_RR,.0036,SK_RR*.7).setTranslation(-SK_HL-SK_RR,0,z)
+      .setDensity(2500).setFriction(.5).setRestitution(.2),b);
+  }
+  skBody=b;
+}
+
+/* 진입: 쥔 자세로 대기 (여러 번 불러도 안전) */
+function startSinkal(){
+  if(skAnim){ cancelAnimationFrame(skAnim); skAnim=null; }
+  skWorld=null; skBody=null; skResult=null; skMode='idle';
+  skApplyPose(SK_HOLD_POS,SK_HOLD_Q); skStrandsReset();
+  skMode='settle'; skT=0; skLast=performance.now(); buildUI(); skAnim=requestAnimationFrame(skLoop);   // 술이 늘어지게 잠깐 돌린다
+}
+/* 던지기: 위로, 조금 앞으로, 칼끝이 앞뒤로 도는 방향(좌우 축)으로 빙글빙글 */
+function throwSinkal(){
+  if(skMode==='fly') return;
+  if(skAnim){ cancelAnimationFrame(skAnim); skAnim=null; }
+  skApplyPose(SK_HOLD_POS,SK_HOLD_Q);
+  if(skMode==='done') skStrandsReset();
+  cam.position.set(...CAMS.sinkal.pos); cam.lookAt(...CAMS.sinkal.look);
+  skBuildWorld();
+  const spin=(7+Math.random()*7)*(Math.random()<.5?1:-1);
+  skBody.setLinvel({x:(Math.random()-.5)*.25, y:2.30+Math.random()*.40, z:-(.30+Math.random()*.25)},true);
+  skBody.setAngvel({x:spin, y:(Math.random()-.5)*2.2, z:(Math.random()-.5)*2.4},true);
+  skResult=null; skMode='fly'; skT=0; skAcc=0; skStill=0; skReal=performance.now(); skLast=skReal;
+  buildUI(); skAnim=requestAnimationFrame(skLoop);
+}
+// 술이 받는 공기 저항을 고리 자리에 (가닥이 바람을 받는 넓이 ≈ 칼마다 0.012m², 저항계수 1.2).
+// addForceAtPoint 는 이 판의 Rapier 에서 바닥에 닿은 뒤 계산이 NaN 으로 깨졌다 → 무게중심의 힘 + 회전력으로 나눠 준다
+function skTasselDrag(){
+  skBody.resetForces(false); skBody.resetTorques(false);
+  if(skBody.isSleeping()) return;
+  const tr=skBody.translation(), c=skBody.worldCom?skBody.worldCom():tr, r=skBody.rotation(), v=skBody.linvel(), w=skBody.angvel();
+  const q=new THREE.Quaternion(r.x,r.y,r.z,r.w), F=new THREE.Vector3(), Tq=new THREE.Vector3();
+  for(const z of SK_OFF){
+    const arm=new THREE.Vector3(SK_RING_X,0,z).applyQuaternion(q).add(new THREE.Vector3(tr.x-c.x,tr.y-c.y,tr.z-c.z));
+    const vp=new THREE.Vector3(v.x,v.y,v.z).add(new THREE.Vector3(w.x,w.y,w.z).cross(arm));
+    const sp=vp.length(); if(sp<.02) continue;
+    const fk=vp.multiplyScalar(-.5*1.2*1.2*.012*sp); F.add(fk); Tq.add(arm.clone().cross(fk));
+  }
+  skBody.addForce({x:F.x,y:F.y,z:F.z},false); skBody.addTorque({x:Tq.x,y:Tq.y,z:Tq.z},false);
+}
+function skLoop(now){
+  const dt=Math.min((now-skLast)/1000,.05); skLast=now; skT+=dt;
+  if(skMode==='fly'){
+    skAcc+=dt; let n=0;
+    while(skAcc>=SK_DT&&n++<80){ skTasselDrag(); skWorld.step(); skAcc-=SK_DT; }
+    const p=skBody.translation(), q=skBody.rotation(); skApplyPose(p,q);
+    skStrandsStep(dt,4);
+    const v=skBody.linvel(), w=skBody.angvel();
+    const still=Math.hypot(v.x,v.y,v.z)<.02 && Math.hypot(w.x,w.y,w.z)<.25 && p.y<.05;
+    skStill=still?skStill+1:0;
+    if(skT>2.2){ skBody.setLinvel({x:v.x*.9,y:v.y,z:v.z*.9},false); skBody.setAngvel({x:w.x*.85,y:w.y*.85,z:w.z*.85},false); }
+    if(skStill>=10||(now-skReal)>7000){
+      skJudge(); skMode='tail'; skT=0;
+      skCamFrom.copy(cam.position); skLookFrom.set(...CAMS.sinkal.look);
+      skLookTo.set(p.x,0,p.z-.02); skCamTo.set(p.x*.5,.60,p.z+.52);         // 칼끝 방향이 한눈에 보이게 내려다본다
+    }
+  } else {
+    if(skMode==='tail'){ const e=Math.min(1,skT/.9), k=e*e*(3-2*e);
+      cam.position.lerpVectors(skCamFrom,skCamTo,k); skLookNow.lerpVectors(skLookFrom,skLookTo,k); cam.lookAt(skLookNow); }
+    skStrandsStep(dt,4);                                  // 대기·끝난 뒤: 술만 잠깐 가라앉힌다
+    if(skT>1.6){ skStrandsDraw(); draw(); skAnim=null; if(skMode==='settle') skMode='idle'; else if(skMode==='tail') skMode='done'; buildUI(); return; }
+  }
+  skStrandsDraw(); draw();
+  skAnim=requestAnimationFrame(skLoop);
+}
+/* 판정: 칼끝(로컬 +X)을 바닥에 비춘 방향이 보는 사람 반대편(-Z)이면 저쪽 */
+function skJudge(){
+  const r=skBody.rotation(); const tip=new THREE.Vector3(1,0,0).applyQuaternion(new THREE.Quaternion(r.x,r.y,r.z,r.w));
+  const deg=Math.round(Math.atan2(tip.x,-tip.z)*180/Math.PI);        // 0 = 곧게 저쪽, ±180 = 곧게 이쪽
+  skResult={side: tip.z<0?'저쪽':'이쪽', deg};
+  buildUI();
+}
+if(/(^|[?&#])debug\b/.test(location.search+location.hash))
+  window.__sinkal={start:startSinkal, throw:throwSinkal, state:()=>({mode:skMode, result:skResult,
+    pos:skBody&&skBody.translation(), rot:skBody&&skBody.rotation()})};
+
 /* ══ 입력 ══ */
 const ray=new THREE.Raycaster(), ptr=new THREE.Vector2();
 function toNDC(e){
@@ -5600,9 +5849,10 @@ addEventListener('pointerdown',e=>{
     else if(k==='roll'){ setScreen('flag'); flagPick(); }
     else if(k==='juyeok'){ setScreen('yijing'); startYijing(); }      // Kiro 진입점 규약
     else if(k==='santong'){ toast('산통은 준비 중입니다'); }           // 법식 확정 뒤 연결
-    else if(k==='sinkal'){ toast('대신칼은 준비 중입니다'); }
+    else if(k==='sinkal'){ setScreen('sinkal'); startSinkal(); }
     return;
   }
+  if(screen==='sinkal'){ if(skMode!=='fly') throwSinkal(); return; }   // 짚으면 던진다 / 멈춘 뒤 다시
   if(screen==='rice'){
     if(rMode==='pick') return;
     if(rMode==='hand') releaseRice();
@@ -5635,6 +5885,8 @@ addEventListener('pointercancel',()=>{dragOn=false;});
 function buildUI(){
   let h='';
   { const hi=document.getElementById('homeimg'); if(hi) hi.style.display=(screen==='home'&&!edit)?'block':'none'; }
+  gSinkal.visible=(screen==='sinkal');                                   // 대신칼 3D 는 대신칼 화면에서만
+  if(screen!=='sinkal'&&skAnim){ cancelAnimationFrame(skAnim); skAnim=null; }
   if(screen==='home'){
     h=`<div class="head home"><div class="t">휴대점상</div>
        <div class="s">${edit?'무구를 끌어 자리를 잡으십시오':'무구를 짚어 점사를 여십시오'}</div></div>
@@ -5650,6 +5902,14 @@ function buildUI(){
         <div class="read" id="readout">${editRead()}</div>
       </div>`;
     }
+  } else if(screen==='sinkal'){
+    h=`<div class="bar"><div class="back" data-go="home">‹ 점상</div>
+       <div class="ttl">대신칼</div><div class="rt"></div></div>`;
+    if(skResult&&(skMode==='tail'||skMode==='done')){
+      h+=`<div class="verdict on"><div class="a">${skResult.side}</div>
+            <div class="b">칼끝이 ${skResult.side}을 향했습니다</div></div>
+          <div class="hint">짚으면 다시 던집니다</div>`;
+    } else if(skMode!=='fly') h+=`<div class="hint">짚으면 대신칼을 던집니다</div>`;
   } else if(screen==='flag'){
     h=`<div class="bar"><div class="back" data-go="home">‹ 점상</div>
        <div class="ttl">${flagSet==='chil'?(flagLine==='south'?'칠방기 · 이남':'칠방기 · 이북'):'오방기'}</div><div class="rt"></div></div>`;
