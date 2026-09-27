@@ -5909,13 +5909,22 @@ function homeHit(e){
   if(innerHeight>innerWidth){ const t=x; x=y; y=VH-t; }               // 세로 화면은 눕혀 쓴다 (toNDC 와 같은 규칙)
   const sc=Math.max(VW/HOME_IMG_W, VH/HOME_IMG_H);
   const fx=(x-(VW-HOME_IMG_W*sc)/2)/(HOME_IMG_W*sc), fy=(y-(VH-HOME_IMG_H*sc)/2)/(HOME_IMG_H*sc);
-  const PAD=0.02, MIN=0.09;                                          // 작은 무구도 손가락으로 짚기 쉽게 넉넉히
-  for(const k of HOME_HOT_ORDER){
-    let [x0,y0,x1,y1]=HOME_HOT[k];
-    const cx=(x0+x1)/2, cy=(y0+y1)/2, hw=Math.max((x1-x0)/2+PAD,MIN/2), hh=Math.max((y1-y0)/2+PAD,MIN/2);
-    if(Math.abs(fx-cx)<=hw&&Math.abs(fy-cy)<=hh) return k;
-  }
-  return null;
+  // 무구 상자가 겹치므로(오방기는 세로로 길고 쌀 상자가 그 위를 침범) "먼저 매치" 방식은
+  // 작은 무구로 오판한다. 대신 손가락이 든 후보를 모두 모아 중심에서 가장 가까운 것을 고른다.
+  // 정규화 거리(상자 절반폭으로 나눔)를 써서 상자 모양이 달라도 공정하게 비교한다.
+  const pick=(pad,min)=>{
+    let best=null, bestD=Infinity;
+    for(const k in HOME_HOT){
+      const [x0,y0,x1,y1]=HOME_HOT[k];
+      const cx=(x0+x1)/2, cy=(y0+y1)/2;
+      const hw=Math.max((x1-x0)/2+pad,min/2), hh=Math.max((y1-y0)/2+pad,min/2);
+      const dx=Math.abs(fx-cx)/hw, dy=Math.abs(fy-cy)/hh;
+      if(dx<=1&&dy<=1){ const d=Math.max(dx,dy); if(d<bestD){ bestD=d; best=k; } }
+    }
+    return best;
+  };
+  // 1차: 부풀리지 않은 실제 영역으로 판정 (겹칠 때 중심 가까운 무구가 이긴다)
+  return pick(0,0) || pick(0.02,0.09);   // 2차: 아무데도 안 들면 넉넉히 부풀려 가장자리 짚기 보조
 }
 let toastT=0;
 function toast(msg){
