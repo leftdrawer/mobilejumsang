@@ -5161,7 +5161,7 @@ async function drawFlags(n){
         for(let v=0;v<pos.count;v++) pos.setXYZ(v,base[v*3],base[v*3+1],base[v*3+2]);
         pos.needsUpdate=true; g.computeVertexNormals();
       }
-      draw(); flagBusy=false;
+      draw(); flagBusy=false; updNotice();   // 뽑는 중 첫 화면으로 돌아갔으면 새 판 알림을 다시 본다
     }
   })(start);
   buildUI();
