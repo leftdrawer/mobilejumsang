@@ -5699,7 +5699,7 @@ function startSantong(){
    그 산가지에 번호가 새겨져(번호판) 카메라를 향한다. */
 function shakeSantong(){
   if(stMode==='shake') return;
-  stMode='shake'; stResult=null;
+  stMode='shake'; stResult=null; buildUI();             // 흔드는 동안 '나오는 중' 안내를 띄우고 앞 결과를 지운다
   const num=1+Math.floor(Math.random()*ST_N);           // 뽑힐 번호
   const chosen=stSticks[Math.floor(Math.random()*stSticks.length)];
   stChosen=chosen;
