@@ -17,7 +17,7 @@ index.html은 하나의 큰 파일이다.
 
 ## 화면 전환 뼈대
 
-- **`setScreen(s)`** — 화면 키(`home`/`flag`/`coin`/`rice`/`yijing`/`santong`/`sinkal`)를 받아 씬 그룹 가시성을 토글하고 카메라를 옮긴다: `cam.position.set(...CAMS[s].pos); cam.lookAt(...CAMS[s].look)`.
+- **`setScreen(s)`** — 화면 키(`home`/`flag`/`coin`/`rice`/`yijing`/`santong`)를 받아 씬 그룹 가시성을 토글하고 카메라를 옮긴다: `cam.position.set(...CAMS[s].pos); cam.lookAt(...CAMS[s].look)`.
 - **`CAMS`** — 화면별 카메라 위치·시선. 예: `CAMS.santong = {pos:[0,0.070,0.250], look:[0,0.020,0]}`.
 - **`buildUI()`** — 현재 `screen`에 맞춰 UI(제목·안내·결과·버튼)를 다시 그린다. 첫머리에서 씬 그룹 가시성도 토글한다. 화면별 분기(`if(screen==='...')`)로 나뉜다.
 - **`draw()`** — 한 프레임 렌더. **WebGL은 크기가 바뀌면 버퍼가 지워지므로 `layout()` 뒤 반드시 `draw()`.**
@@ -75,11 +75,6 @@ index.html은 하나의 큰 파일이다.
 2. 통에서 완전히 빼서 기울임 → 화면 밖으로 사라짐.
 3. 입구를 축으로 눕히기 → 은호당님: 위로 올라가 있고 갑자기 옆으로 기울어 어색함.
 4. **현재(v1.1.1): 곧게 위로만 솟기** — 뽑힌 산가지가 원래 자리에서 수직으로 솟아 나머지와 나란히 섬. 카메라를 낮춰 통을 화면 중앙에. (은호당님 지시: "옆으로 하나가 뽑혀 수직으로 나란히 서는 연출")
-
-## 대신칼 (sinkal) — Claude 초안 → Kiro 머지
-
-- 씬 그룹 `gSinkal`. **`startSinkal()`** / **`throwSinkal()`**. Rapier 물리로 두 자루 한 덩어리 던짐.
-- 술: Verlet 끈 + 공기 저항. 판정: 칼끝 저쪽(부정 나감)/이쪽(안 나감)/옆. 판정각 ±45°/135°는 은호당님 확인 전.
 
 ## 엽전 (coin) / 오방기 (flag) / 요미산 (rice) — 초기 구현
 
