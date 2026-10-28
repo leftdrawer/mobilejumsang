@@ -27,6 +27,8 @@
     background:rgba(12,7,4,.78);color:#e8d7b0;font-size:calc(var(--u)*2.8);border-radius:calc(var(--u)*1);
     opacity:0;transition:opacity .25s;pointer-events:none;z-index:8}
   .toast.on{opacity:1}
+  .toast.upd{pointer-events:auto;cursor:pointer}
+  .toast.upd button{font:inherit;color:inherit;background:none;border:0;padding:0;cursor:pointer;letter-spacing:.06em}
   /* 첫 화면: 제목·안내를 왼쪽 위 빈 바닥에 둔다 (가운데 두면 산통 살을 가린다) */
   .head.home{right:auto;text-align:left;background:none;padding-left:calc(var(--w)*4);padding-top:calc(var(--u)*5)}
   .head.home .t{text-indent:0}
@@ -5809,11 +5811,23 @@ function homeHit(e){
 }
 let toastT=0;
 function toast(msg){
-  let el=app.querySelector('.toast'); if(!el){ el=document.createElement('div'); el.className='toast'; el.setAttribute('role','status'); app.appendChild(el); }
+  let el=app.querySelector('.toast:not(.upd)'); if(!el){ el=document.createElement('div'); el.className='toast'; el.setAttribute('role','status'); app.appendChild(el); }
   el.textContent=msg; el.classList.add('on'); clearTimeout(toastT); toastT=setTimeout(()=>el.classList.remove('on'),1600);
 }
+// 새 판 알림: 서비스 워커가 새 index.html 을 받으면 첫 화면 아래에 띄운다. 점을 치는 도중에는 띄우지 않고, 저절로 새로고침하지 않는다
+function updNotice(){
+  const want=!!window.__hjNewVer&&window.__ready===true&&screen==='home'&&!edit
+    &&!(mode==='fly'||rMode==='fly'||yjMode==='spin'||stMode==='shake'||flagBusy);
+  let el=document.getElementById('updnote');
+  if(!el){ if(!want) return;
+    el=document.createElement('div'); el.id='updnote'; el.className='toast upd'; el.setAttribute('role','status'); el.setAttribute('aria-live','polite');
+    const b=document.createElement('button'); b.type='button'; b.textContent='새 판을 받았습니다. 짚으면 바꿉니다';
+    b.onclick=()=>location.reload(); el.appendChild(b); app.appendChild(el); }
+  el.hidden=!want; el.classList.toggle('on',want);
+}
+window.__hjUpd=updNotice;
 addEventListener('pointerdown',e=>{
-  if(e.target.closest('.btn')||e.target.closest('.back')||e.target.closest('.panel')||e.target.closest('.editbtn')) return;
+  if(e.target.closest('.btn')||e.target.closest('.back')||e.target.closest('.panel')||e.target.closest('.editbtn')||e.target.closest('.upd')) return;
   e.preventDefault();
   if(screen==='home'&&edit){
     toNDC(e); ray.setFromCamera(ptr,cam);
@@ -6012,6 +6026,7 @@ function buildUI(){
     else if(a==='ymhwa'){ riceMode2='scatter'; spawnRice(); }
     else resetFlags();
   });
+  updNotice();
 }
 
 function draw(){ rn.render(scene,cam); }
@@ -6023,6 +6038,7 @@ clearTimeout(watchdog); clearInterval(tick);
   setTimeout(()=>{ el.classList.add('out');
     setTimeout(()=>{ el.style.display='none'; }, 520); }, wait); }
 window.__ready=true;
+updNotice();
 // 개발용 디버그 훅: 주소에 ?debug 또는 #debug 가 있을 때만 window 에 붙인다 (배포 기본은 노출 안 함)
 if(/(^|[?&#])debug\b/.test(location.search+location.hash)){
 window.__RAPIER=RAPIER;
@@ -6054,6 +6070,7 @@ window.__api={setScreen,drawFlags,flagPick,spawnCoins,releaseCoins,spawnRice,rel
 </script>
 <script>
 if('serviceWorker' in navigator && location.protocol.startsWith('http')){
+  navigator.serviceWorker.addEventListener('message',e=>{ if(e.data&&e.data.type==='hj-new-version'){ window.__hjNewVer=true; if(typeof window.__hjUpd==='function') window.__hjUpd(); } });
   addEventListener('load',()=>navigator.serviceWorker.register('sw.js').catch(()=>{}));
 }
 </script>
