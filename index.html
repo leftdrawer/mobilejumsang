@@ -5607,7 +5607,7 @@ const ST_TEXT=(()=>{
   return m;
 })();
 
-let stSticks=[], stMode='idle', stResult=null, stAnim=null, stLast=0, stChosen=null;
+let stSticks=[], stMode='idle', stResult=null, stAnim=null, stChosen=null;
 const TUBE_R=0.026, TUBE_H=0.100, WALL_T=0.003, ST_SR=0.0017;   // 통 반지름·높이·벽두께, 산가지 반지름
 {
   const woodDark=new THREE.MeshStandardMaterial({color:0x5a3c1e,roughness:.6,metalness:.03});
@@ -5715,7 +5715,6 @@ function shakeSantong(){
   // 뽑힌 산가지는 기울이지 않고 곧게 위로만 솟는다 (나머지와 나란히 서되 확실히 도드라지게).
   const RISE_H = 0.055;                                 // 위로 솟는 높이 (산가지 길이의 약 절반)
   const T0=performance.now(), SHAKE=1300, RISE=800;
-  stLast=T0;
   (function step(now){
     const t=now-T0;
     if(t<SHAKE){
@@ -5785,12 +5784,10 @@ function editRead(){
   }).join('\n');
 }
 /* ══ 첫 화면 짚는 자리 ══
-   blender/render/home_v21_hotspots.json 에서 옮긴 무구별 상자(렌더 3120×1440 기준 0~1, 왼쪽 위 원점).
+   blender/render/home_vNN_raw_hotspots.json 의 무구별 상자를 blender/update_home.py 가 넣는다(렌더 3120×1440 기준 0~1, 왼쪽 위 원점).
    화면 비율이 렌더와 달라도 #homeimg 가 cover 로 꽉 차므로 같은 규칙으로 되돌려 판정한다. */
 const HOME_IMG_W=3120, HOME_IMG_H=1440;
 const HOME_HOT={"roll": [0.1287, 0.2101, 0.3816, 1.3596], "coin": [0.4372, 0.6796, 0.5699, 0.8492], "rice": [0.3518, 0.2871, 0.6423, 0.6723], "santong": [0.6188, -0.0309, 0.7977, 0.6147], "juyeok": [0.6778, 0.6603, 0.7666, 0.8795]};
-const HOME_HOT_ORDER=Object.keys(HOME_HOT).sort((a,b)=>{const A=HOME_HOT[a],B=HOME_HOT[b];
-  return (A[2]-A[0])*(A[3]-A[1])-(B[2]-B[0])*(B[3]-B[1]);});   // 겹치면 작은 무구가 먼저
 function homeHit(e){
   const r=app.getBoundingClientRect();
   let x=e.clientX-r.left, y=e.clientY-r.top;
