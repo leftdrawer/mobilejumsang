@@ -4,7 +4,7 @@
 > 형식: `## vX.Y.Z (커밋해시 또는 미커밋) — 날짜` + 무엇을 왜 바꿨는지.
 > 버전 규칙은 `PROJECT.md` 참고. 미배포 작업은 "미배포"로 표시하고 배포 시 확정한다.
 
-## v1.2.0 (미배포) — 2026-10-28
+## v1.2.0 (a4c874b + 후속 — 배포) — 2026-10-28
 
 - **대신칼(sinkal) 제거 + 5무구 황금비 재배치.** 첫 화면에서 무쇠 대신칼 한 쌍을 빼고 남은 다섯 무구(오방기·쌀·엽전·산통·육효)를 황금비로 다시 맞췄다. 비게 된 오른쪽은 상으로 채우지 않고 상 폭만 줄였다(은호당님 법식: 빈 곳을 상으로 채우지 않는다).
   - **상 폭 IN_W: 0.371984m → 0.323984m**(−4.80cm, −12.9%). 식 `2*(G_OUT+0.042)` → `2*(G_OUT+0.018)`. `TW`도 0.403984 → 0.355984m로 자동 축소. `IN_D=0.300`·`LEG_H=0.26` 보존.
@@ -12,6 +12,8 @@
   - **index.html:** 대신칼 3D 블록 전체(`gSinkal`·`CAMS.sinkal`·`SK_*`·`startSinkal`/`throwSinkal`·Verlet 술·`window.__sinkal` 디버그 훅·장판 바닥) 제거, 입력/화면/buildUI 대신칼 분기 제거, `HOME_HOT`에서 sinkal 키 제거.
   - **blender:** `home_scene.py`에서 대신칼 블록·`KNIFE_X`·`tassel_fill` 보조광 제거, IN_W 식 교체, 초점 상향. 첫 화면 재렌더 `home_v22`(v21 보존), `--hex 117`(水地比) 고정, f/8, 카메라 당김(설계 시작값 `--camd 0.455`).
   - **도구:** 대신칼 전용 `tools/sinkal_stats.mjs`·`tools/sinkal_overlay.py`, `blender/sinkal_block.js`·`blender/tassel_section.js` 삭제.
+  - **후속 정리(a4c874b 커밋 뒤):** `APP_VERSION`과 정적 `<div class="ver">` 표기를 1.1.1→1.2.0으로 올림(최초 커밋에서 누락). `docs/PROJECT.md` 화면 표의 대신칼 행 제거. 루트 `CLAUDE.md`의 삭제된 sinkal_block.js·tassel_section.js 참조 정리.
+  - **미처리(보고):** `claude/` 사본의 미푸시 커밋 87a265d(v1.1.0 대신칼 "세 바퀴")와 `blender/_apply_home.py`(claude 사본용 레거시 반영 스크립트)의 대신칼 토스트 줄은 claude 작업 영역이라 건드리지 않음 — 정리 권장.
 
 ## 미배포 — 2026-10-06
 
