@@ -27,8 +27,10 @@
     background:rgba(12,7,4,.78);color:#e8d7b0;font-size:calc(var(--u)*2.8);border-radius:calc(var(--u)*1);
     opacity:0;transition:opacity .25s;pointer-events:none;z-index:8}
   .toast.on{opacity:1}
-  .toast.upd{pointer-events:auto;cursor:pointer}
-  .toast.upd button{font:inherit;color:inherit;background:none;border:0;padding:0;cursor:pointer;letter-spacing:.06em}
+  .toast.upd{pointer-events:auto;cursor:pointer;padding:0}
+  .toast.upd button{display:block;position:relative;font:inherit;color:inherit;background:none;border:0;padding:calc(var(--u)*1.4) calc(var(--w)*2.4);cursor:pointer;letter-spacing:.06em}
+  /* 보이는 상자는 그대로, 누르는 자리만 아래로 44px 까지 늘린다(위는 엽전 짚는 자리라 늘리지 않는다) */
+  .toast.upd button::after{content:'';position:absolute;left:0;right:0;top:0;height:max(100%,44px)}
   /* 첫 화면: 제목·안내를 왼쪽 위 빈 바닥에 둔다 (가운데 두면 산통 살을 가린다) */
   .head.home{right:auto;text-align:left;background:none;padding-left:calc(var(--w)*4);padding-top:calc(var(--u)*5)}
   .head.home .t{text-indent:0}
