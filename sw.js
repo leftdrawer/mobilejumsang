@@ -31,11 +31,10 @@ const FILES = [
   './assets/rice_rough.webp',
   './assets/rice_ao.webp',
   './assets/rice_grains.json',
+  './assets/heap_pile.json',
   './assets/silk_albedo.webp',
   './assets/silk_normal.webp',
-  './assets/silk_rough.webp',
-  './assets/heap_albedo.webp',
-  './assets/heap_normal.webp'
+  './assets/silk_rough.webp'
 ];
 
 self.addEventListener('install', e => {

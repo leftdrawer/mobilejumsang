@@ -4476,20 +4476,22 @@ function loadTex(url,srgb){
 }
 const [woodAlb,woodNrm,woodRgh,woodLongAlb,woodLongNrm,woodLongRgh,woodEndAlb,woodEndRgh,
        coinFAlb,coinFNrm,coinFOrm,coinBAlb,coinBNrm,coinBOrm,
-       riceAlb,riceNrm,riceRgh,riceAo,silkAlb,silkNrm,silkRgh,heapAlb,heapNrm]=await Promise.all([
+       riceAlb,riceNrm,riceRgh,riceAo,silkAlb,silkNrm,silkRgh]=await Promise.all([
   loadTex('assets/wood_top_albedo.webp',true), loadTex('assets/wood_top_normal.webp',false), loadTex('assets/wood_top_rough.webp',false),
   loadTex('assets/wood_long_albedo.webp',true), loadTex('assets/wood_long_normal.webp',false), loadTex('assets/wood_long_rough.webp',false),
   loadTex('assets/wood_end_albedo.webp',true), loadTex('assets/wood_end_rough.webp',false),
   loadTex('assets/coin_front_albedo.webp',true), loadTex('assets/coin_front_normal.webp',false), loadTex('assets/coin_front_orm.webp',false),
   loadTex('assets/coin_back_albedo.webp',true), loadTex('assets/coin_back_normal.webp',false), loadTex('assets/coin_back_orm.webp',false),
   loadTex('assets/rice_albedo.webp',true), loadTex('assets/rice_normal.webp',false), loadTex('assets/rice_rough.webp',false), loadTex('assets/rice_ao.webp',false),
-  loadTex('assets/silk_albedo.webp',true), loadTex('assets/silk_normal.webp',false), loadTex('assets/silk_rough.webp',false),
-  loadTex('assets/heap_albedo.webp',true), loadTex('assets/heap_normal.webp',false)
+  loadTex('assets/silk_albedo.webp',true), loadTex('assets/silk_normal.webp',false), loadTex('assets/silk_rough.webp',false)
 ]);
 [silkAlb,silkNrm,silkRgh].forEach(t=>{ t.wrapS=t.wrapT=THREE.RepeatWrapping; t.repeat.set(5,1); });
-[heapAlb,heapNrm].forEach(t=>{ t.wrapS=t.wrapT=THREE.RepeatWrapping; t.repeat.set(1,1); });
 const riceMesh=await fetch('assets/rice_grains.json').then(r=>{
   if(!r.ok) throw new Error('쌀알 모양을 읽지 못했습니다');
+  return r.json();
+});
+const heapPile=await fetch('assets/heap_pile.json').then(r=>{
+  if(!r.ok) throw new Error('쌀더미를 읽지 못했습니다');
   return r.json();
 });
 function mkCoinMat(alb,nrm,orm,dead){
@@ -4863,8 +4865,13 @@ function makeCoinBoard(g){
   g.add(mesh);
 }
 makeCoinBoard(gCoin);
-// 요미산 상은 엽전과 같은 판이다. 상자 면으로 깔면 같은 사진이 더 붉게 보인다.
+// 요미산 상은 엽전과 같은 판이다. 비스듬히 보면 더 붉으므로 윗면만 색을 맞춘다.
 makeCoinBoard(gRice);
+{
+  const board=gRice.children[gRice.children.length-1];
+  const top=board&&board.material&&board.material[0];
+  if(top&&top.color) top.color.set(0xeea478);
+}
 makeTray(gHome,0.34,0.26,0);
 
 /* 홈: 말린 오방기 · 엽전 무더기 · 쌀 무더기 */
@@ -5697,118 +5704,52 @@ let rWorld=null, rBodies=[], rMeshes=[], rMode='hand', rN=0,
 const gMound=new THREE.Group(); gRice.add(gMound);
 let silkThread=null, silkGrains=[], grainAO=null;
 {
-  let s=7; const rnd=()=>{s=(s*16807)%2147483647; return s/2147483647;};
-  const R=0.046, HH=0.020;
-  // 더미 본체. 낱알을 수천 개 쌓는 대신, 4mm 안팎의 쌀이 촘촘한 표면으로 덮는다.
-  const g=new THREE.SphereGeometry(R,72,36,0,6.283,0,Math.PI/2);
-  const p=g.attributes.position;
-  for(let i=0;i<p.count;i++){
-    const x=p.getX(i), y=p.getY(i), z=p.getZ(i);
-    const k=1+Math.sin(x*90)*0.012+Math.sin(z*80+0.7)*0.01;
-    p.setXYZ(i, x*k, y*(HH/R)*k, z*k);
+  // 쏟아 앉힌 낱알. 매끈한 속면은 없다. 위치는 미리 가라앉힌 더미다.
+  function b64i16(s){
+    const bin=Uint8Array.from(atob(s), c=>c.charCodeAt(0));
+    const buf=new ArrayBuffer(bin.byteLength);
+    new Uint8Array(buf).set(bin);
+    return new Int16Array(buf);
   }
-  g.computeVertexNormals();
-  const TILE=0.022, uv=new Float32Array(p.count*2);
-  for(let i=0;i<p.count;i++){
-    const x=p.getX(i), y=p.getY(i), z=p.getZ(i), rad=Math.hypot(x,z)||1e-6;
-    // 이음은 카메라 반대편(-Z). 둘레·높이 모두 실제 길이로 깔아 옆면이 늘어지지 않게 한다.
-    const arc=Math.acos(Math.max(-1,Math.min(1,y/HH)))*R;
-    uv[i*2]=Math.atan2(x,z)*rad/TILE;
-    uv[i*2+1]=arc/TILE;
+  function b64u8(s){
+    const bin=Uint8Array.from(atob(s), c=>c.charCodeAt(0));
+    return bin;
   }
-  g.setAttribute('uv', new THREE.BufferAttribute(uv,2));
-  g.setAttribute('uv2', new THREE.BufferAttribute(uv.slice(),2));
-  const mMat=new THREE.MeshStandardMaterial({
-    map:heapAlb, normalMap:heapNrm, roughness:0.72, metalness:0,
-    normalScale:new THREE.Vector2(1.05,1.05), envMapIntensity:0.08, color:0xfff7f0
-  });
-  const mound=new THREE.Mesh(g,mMat); mound.position.y=0.0002;
-  mound.castShadow=mound.receiveShadow=true; gMound.add(mound);
-
-  const cc=document.createElement('canvas'); cc.width=cc.height=128;
-  const cx=cc.getContext('2d');
-  const cg=cx.createRadialGradient(64,64,8,64,64,64);
-  cg.addColorStop(0,'rgba(20,12,6,0.45)');
-  cg.addColorStop(0.55,'rgba(20,12,6,0.18)');
-  cg.addColorStop(1,'rgba(20,12,6,0)');
-  cx.fillStyle=cg; cx.fillRect(0,0,128,128);
-  const contact=new THREE.Mesh(new THREE.CircleGeometry(0.058,40),
-    new THREE.MeshBasicMaterial({map:T(cc,false),transparent:true,depthWrite:false,opacity:0.8}));
-  contact.rotation.x=-Math.PI/2; contact.position.y=0.00045; gMound.add(contact);
-
-  // 겉면 푸아송. 중심 간격이 알 폭보다 좁아지지 않게 해 서로 파고들지 않는다.
-  function poissonShell(rad, hh, minD, maxN){
-    const cell=minD, grid=new Map(), pts=[];
-    const bucket=k=>{ let b=grid.get(k); if(!b){ b=[]; grid.set(k,b); } return b; };
-    let guard=0;
-    while(pts.length<maxN && guard<maxN*50){
-      guard++;
-      const a=rnd()*6.283, u=rnd(), st=Math.sqrt(Math.max(0,1-u*u));
-      const x=Math.cos(a)*rad*st, y=hh*u, z=Math.sin(a)*rad*st;
-      const ix=Math.floor(x/cell), iy=Math.floor(y/cell), iz=Math.floor(z/cell);
-      let ok=true;
-      for(let dx=-1;dx<=1&&ok;dx++) for(let dy=-1;dy<=1&&ok;dy++) for(let dz=-1;dz<=1&&ok;dz++){
-        const nb=grid.get((ix+dx)+','+(iy+dy)+','+(iz+dz));
-        if(!nb) continue;
-        for(const q of nb){
-          const ex=q.x-x, ey=q.y-y, ez=q.z-z;
-          if(ex*ex+ey*ey+ez*ez<minD*minD){ ok=false; break; }
-        }
-      }
-      if(!ok) continue;
-      const pt={x,y,z,u,a};
-      pts.push(pt); bucket(ix+','+iy+','+iz).push(pt);
-    }
-    for(let pass=0;pass<4;pass++){
-      for(const q of pts){
-        let px=0, py=0, pz=0, n=0;
-        const ix=Math.floor(q.x/cell), iy=Math.floor(q.y/cell), iz=Math.floor(q.z/cell);
-        for(let dx=-1;dx<=1;dx++) for(let dy=-1;dy<=1;dy++) for(let dz=-1;dz<=1;dz++){
-          const nb=grid.get((ix+dx)+','+(iy+dy)+','+(iz+dz));
-          if(!nb) continue;
-          for(const o of nb){
-            if(o===q) continue;
-            const ex=q.x-o.x, ey=q.y-o.y, ez=q.z-o.z, d2=ex*ex+ey*ey+ez*ez;
-            if(d2>1e-10 && d2<minD*minD){
-              const d=Math.sqrt(d2), push=(minD-d)/d*0.35;
-              px+=ex*push; py+=ey*push; pz+=ez*push; n++;
-            }
-          }
-        }
-        if(n){ q.x+=px; q.y=Math.max(0,q.y+py); q.z+=pz; }
-      }
-    }
-    return pts;
-  }
-  const up=new THREE.Vector3(0,1,0), nrm=new THREE.Vector3();
-  function lay(pts, geo, mat, sx, sy, sz){
-    const inst=new THREE.InstancedMesh(geo, mat, pts.length);
-    inst.count=pts.length; inst.castShadow=false; inst.receiveShadow=true;
-    const M=new THREE.Matrix4(), Q=new THREE.Quaternion(), twist=new THREE.Quaternion(),
-          align=new THREE.Quaternion(), P=new THREE.Vector3(), S=new THREE.Vector3(), col=new THREE.Color();
-    pts.forEach((q,i)=>{
-      const st=Math.sqrt(Math.max(0,1-q.u*q.u));
-      nrm.set(Math.cos(q.a)*st*(HH/R), q.u, Math.sin(q.a)*st*(HH/R));
-      if(nrm.lengthSq()<1e-8) nrm.set(0,1,0); else nrm.normalize();
-      P.set(q.x, q.y, q.z).addScaledVector(nrm, 0.00045);
-      const j=0.9+rnd()*0.16;
-      S.set(sx*j, sy*j, sz*j);
-      align.setFromUnitVectors(up, nrm);
-      twist.setFromAxisAngle(nrm, rnd()*6.283);
-      Q.multiplyQuaternions(twist, align);
-      M.compose(P,Q,S); inst.setMatrixAt(i,M);
-      const w=0.9+rnd()*0.1;
-      col.setRGB(w, w*0.985, w*0.95);
-      inst.setColorAt(i,col);
+  const hp=b64i16(heapPile.p), hq=b64i16(heapPile.q), hs=b64u8(heapPile.sc);
+  const grainLod=grainBuf(heapPile.mesh);
+  const pearl=[], chalk=[];
+  for(let i=0;i<heapPile.n;i++) (i%13===0?chalk:pearl).push(i);
+  function pour(idx, mat){
+    const inst=new THREE.InstancedMesh(grainLod, mat, idx.length);
+    inst.count=idx.length; inst.castShadow=false; inst.receiveShadow=false;
+    const M=new THREE.Matrix4(), P=new THREE.Vector3(), Q=new THREE.Quaternion(), S=new THREE.Vector3(), col=new THREE.Color();
+    idx.forEach((i,k)=>{
+      P.set(hp[i*3], hp[i*3+1], hp[i*3+2]).multiplyScalar(heapPile.unit);
+      Q.set(hq[i*4], hq[i*4+1], hq[i*4+2], hq[i*4+3]);
+      if(Q.lengthSq()<1e-8) Q.identity(); else Q.normalize();
+      const sc=0.90+hs[i]/255*0.10;
+      S.set(sc,sc,sc);
+      M.compose(P,Q,S); inst.setMatrixAt(k,M);
+      const w=0.96+((i*17)%40)/1000;
+      col.setRGB(w, w*0.995, w*0.985);
+      inst.setColorAt(k,col);
     });
     inst.instanceMatrix.needsUpdate=true;
     if(inst.instanceColor) inst.instanceColor.needsUpdate=true;
     gMound.add(inst);
-    return inst;
   }
-  // 겉의 낱알은 얇게만. 길이는 본문 무늬의 알(약 4mm)보다 크지 않고, 두께를 눌러 고치처럼 부풀지 않게 한다.
-  const skin=poissonShell(R*0.995, HH*0.97, 0.0055, 140);
-  lay(skin, grainWhole, grainMat, 0.5, 0.22, 0.34);
+  pour(pearl, grainMat);
+  pour(chalk, grainChalkMat);
+  const cc=document.createElement('canvas'); cc.width=cc.height=128;
+  const cx=cc.getContext('2d');
+  const cg=cx.createRadialGradient(64,64,8,64,64,64);
+  cg.addColorStop(0,'rgba(20,12,6,0.40)');
+  cg.addColorStop(0.55,'rgba(20,12,6,0.16)');
+  cg.addColorStop(1,'rgba(20,12,6,0)');
+  cx.fillStyle=cg; cx.fillRect(0,0,128,128);
+  const contact=new THREE.Mesh(new THREE.CircleGeometry(0.052,40),
+    new THREE.MeshBasicMaterial({map:T(cc,false),transparent:true,depthWrite:false,opacity:0.5}));
+  contact.rotation.x=-Math.PI/2; contact.position.y=0.00045; gMound.add(contact);
 
   // 명주실: 가로로 걸치고 가운데가 제 무게로 처진다. 양 끝은 손이 쥔다
   silkThread=new THREE.Group();
