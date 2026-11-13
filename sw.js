@@ -31,7 +31,8 @@ const FILES = [
   './assets/rice_rough.webp',
   './assets/rice_ao.webp',
   './assets/rice_grains.json',
-  './assets/heap_pile.json',
+  './assets/rice_plate.webp',
+  './assets/rice_heap_h.json',
   './assets/silk_albedo.webp',
   './assets/silk_normal.webp',
   './assets/silk_rough.webp'
