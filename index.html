@@ -5717,6 +5717,7 @@ let silkThread=null, silkGrains=[], grainAO=null;
   plateCam.updateProjectionMatrix();
   const uPlate=new THREE.Matrix4().multiplyMatrices(plateCam.projectionMatrix, plateCam.matrixWorldInverse);
   const plateMat=new THREE.MeshBasicMaterial({map:ricePlate});
+  plateMat.toneMapped=false;
   plateMat.onBeforeCompile=(shader)=>{
     shader.uniforms.uPlate={value:uPlate};
     shader.vertexShader=shader.vertexShader
@@ -5747,7 +5748,7 @@ let silkThread=null, silkGrains=[], grainAO=null;
   const heapCatch=new THREE.Mesh(hgeo, plateMat);
   heapCatch.castShadow=false; heapCatch.receiveShadow=true;
   gMound.add(heapCatch);
-  const catchShadow=new THREE.Mesh(hgeo, new THREE.ShadowMaterial({opacity:0.35}));
+  const catchShadow=new THREE.Mesh(hgeo, new THREE.ShadowMaterial({opacity:0.1}));
   catchShadow.receiveShadow=true; catchShadow.castShadow=false;
   catchShadow.position.y=0.0002;
   gMound.add(catchShadow);
