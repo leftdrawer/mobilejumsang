@@ -4476,16 +4476,18 @@ function loadTex(url,srgb){
 }
 const [woodAlb,woodNrm,woodRgh,woodLongAlb,woodLongNrm,woodLongRgh,woodEndAlb,woodEndRgh,
        coinFAlb,coinFNrm,coinFOrm,coinBAlb,coinBNrm,coinBOrm,
-       riceAlb,riceNrm,riceRgh,riceAo,silkAlb,silkNrm,silkRgh]=await Promise.all([
+       riceAlb,riceNrm,riceRgh,riceAo,silkAlb,silkNrm,silkRgh,heapAlb,heapNrm]=await Promise.all([
   loadTex('assets/wood_top_albedo.webp',true), loadTex('assets/wood_top_normal.webp',false), loadTex('assets/wood_top_rough.webp',false),
   loadTex('assets/wood_long_albedo.webp',true), loadTex('assets/wood_long_normal.webp',false), loadTex('assets/wood_long_rough.webp',false),
   loadTex('assets/wood_end_albedo.webp',true), loadTex('assets/wood_end_rough.webp',false),
   loadTex('assets/coin_front_albedo.webp',true), loadTex('assets/coin_front_normal.webp',false), loadTex('assets/coin_front_orm.webp',false),
   loadTex('assets/coin_back_albedo.webp',true), loadTex('assets/coin_back_normal.webp',false), loadTex('assets/coin_back_orm.webp',false),
   loadTex('assets/rice_albedo.webp',true), loadTex('assets/rice_normal.webp',false), loadTex('assets/rice_rough.webp',false), loadTex('assets/rice_ao.webp',false),
-  loadTex('assets/silk_albedo.webp',true), loadTex('assets/silk_normal.webp',false), loadTex('assets/silk_rough.webp',false)
+  loadTex('assets/silk_albedo.webp',true), loadTex('assets/silk_normal.webp',false), loadTex('assets/silk_rough.webp',false),
+  loadTex('assets/heap_albedo.webp',true), loadTex('assets/heap_normal.webp',false)
 ]);
 [silkAlb,silkNrm,silkRgh].forEach(t=>{ t.wrapS=t.wrapT=THREE.RepeatWrapping; t.repeat.set(5,1); });
+[heapAlb,heapNrm].forEach(t=>{ t.wrapS=t.wrapT=THREE.RepeatWrapping; t.repeat.set(1,1); });
 const riceMesh=await fetch('assets/rice_grains.json').then(r=>{
   if(!r.ok) throw new Error('쌀알 모양을 읽지 못했습니다');
   return r.json();
@@ -4861,19 +4863,8 @@ function makeCoinBoard(g){
   g.add(mesh);
 }
 makeCoinBoard(gCoin);
-function makeRiceTray(g){
-  // 크기·자리는 예전 쟁반과 같다. 결만 엽전 상과 같은 촬영 나무.
-  const W=TRAY_W+0.040, D=TRAY_D+0.035, y0=0;
-  const top=woodBoardMat(woodAlb,woodNrm,woodRgh);
-  const longM=woodBoardMat(woodLongAlb,woodLongNrm,woodLongRgh);
-  const endM=woodBoardMat(woodEndAlb,null,woodEndRgh);
-  endM.normalMap=null;
-  const bot=new THREE.MeshStandardMaterial({color:0x3a2618,roughness:.86,metalness:0});
-  const board=new THREE.Mesh(new THREE.BoxGeometry(W+0.03,0.014,D+0.03),
-    [endM,endM,top,bot,longM,longM]);
-  board.position.y=y0-0.007; board.receiveShadow=true; board.castShadow=true; g.add(board);
-}
-makeRiceTray(gRice);
+// 요미산 상은 엽전과 같은 판이다. 상자 면으로 깔면 같은 사진이 더 붉게 보인다.
+makeCoinBoard(gRice);
 makeTray(gHome,0.34,0.26,0);
 
 /* 홈: 말린 오방기 · 엽전 무더기 · 쌀 무더기 */
@@ -5061,15 +5052,23 @@ let screen='home';
 function coinShadow(s){
   // 엽전·요미산만 그림자를 바짝 잡아 나무결·접점이 보이게 한다. 다른 화면은 원래 범위.
   const sc=key.shadow.camera;
+  const shadowPx=n=>{
+    if(key.shadow.mapSize.x===n) return;
+    key.shadow.mapSize.set(n,n);
+    if(key.shadow.map){ key.shadow.map.dispose(); key.shadow.map=null; }
+  };
   if(s==='coin'){
     sc.left=-0.14; sc.right=0.14; sc.top=0.12; sc.bottom=-0.12;
     key.shadow.bias=-0.00008; key.shadow.normalBias=0.0004; key.shadow.radius=1;
+    shadowPx(1024);
   }else if(s==='rice'){
-    sc.left=-0.13; sc.right=0.13; sc.top=0.11; sc.bottom=-0.11;
-    key.shadow.bias=-0.00016; key.shadow.normalBias=0.00032; key.shadow.radius=1.5;
+    sc.left=-0.11; sc.right=0.11; sc.top=0.09; sc.bottom=-0.09;
+    key.shadow.bias=-0.00045; key.shadow.normalBias=0.00006; key.shadow.radius=2.4;
+    shadowPx(2048);
   }else{
     sc.left=-1.6; sc.right=1.6; sc.top=1.6; sc.bottom=-1.6;
     key.shadow.bias=-0.0005; key.shadow.normalBias=0; key.shadow.radius=1;
+    shadowPx(1024);
   }
   sc.updateProjectionMatrix();
 }
@@ -5668,23 +5667,25 @@ function grainBuf(src){
 const grainWhole=grainBuf(riceMesh.whole), grainBroken=grainBuf(riceMesh.broken);
 try{ grainWhole.computeTangents(); grainBroken.computeTangents(); }catch(e){ console.warn('쌀 접선', e); }
 function grainMatOf(chalk){
+  // 생 단립종은 우유빛으로 반투명하고, 거울반사는 거의 없다. 거칠기 0.6–0.75.
   return new THREE.MeshPhysicalMaterial({
     name:chalk?'rice-chalk':'rice-pearl',
     map:riceAlb, normalMap:riceNrm, aoMap:riceAo,
-    roughnessMap:chalk?null:riceRgh,
-    aoMapIntensity:chalk?0.2:0.48,
-    normalScale:new THREE.Vector2(chalk?0.3:1.05, chalk?0.3:1.05),
-    color:chalk?0xf3f0e8:0xf4ecdf,
-    roughness:chalk?0.97:1,
+    aoMapIntensity:chalk?0.12:0.28,
+    normalScale:new THREE.Vector2(chalk?0.15:0.38, chalk?0.15:0.38),
+    color:chalk?0xf7f4ee:0xf3eee6,
+    roughness:chalk?0.92:0.7,
     metalness:0,
-    sheen:chalk?0.02:0.18,
-    sheenRoughness:chalk?0.92:0.7,
-    sheenColor:new THREE.Color(0xf6efe2),
+    sheen:chalk?0:0.04,
+    sheenRoughness:0.85,
+    sheenColor:new THREE.Color(0xf4efe6),
     clearcoat:0,
-    clearcoatRoughness:0.7,
-    emissive:new THREE.Color(chalk?0x000000:0xf3e6cc),
-    emissiveIntensity:chalk?0:0.018,
-    envMapIntensity:0.2
+    transmission:chalk?0:0.045,
+    thickness:0.002,
+    attenuationColor:new THREE.Color(0xf0e6d4),
+    attenuationDistance:0.012,
+    ior:1.46,
+    envMapIntensity:chalk?0.04:0.08
   });
 }
 const grainMat=grainMatOf(false), grainChalkMat=grainMatOf(true);
@@ -5694,20 +5695,34 @@ let rWorld=null, rBodies=[], rMeshes=[], rMode='hand', rN=0,
 
 /* 쌀더미와 명주실 (명주실 점에서만 보인다) */
 const gMound=new THREE.Group(); gRice.add(gMound);
-let silkThread=null, silkGrains=[];
+let silkThread=null, silkGrains=[], grainAO=null;
 {
   let s=7; const rnd=()=>{s=(s*16807)%2147483647; return s/2147483647;};
-  const mMat=new THREE.MeshStandardMaterial({color:0xd5c6b0,roughness:.9,metalness:0});
   const R=0.046, HH=0.020;
-  const g=new THREE.SphereGeometry(R-0.007,44,26,0,6.283,0,Math.PI/2);
+  // 더미 본체. 낱알을 수천 개 쌓는 대신, 4mm 안팎의 쌀이 촘촘한 표면으로 덮는다.
+  const g=new THREE.SphereGeometry(R,72,36,0,6.283,0,Math.PI/2);
   const p=g.attributes.position;
   for(let i=0;i<p.count;i++){
     const x=p.getX(i), y=p.getY(i), z=p.getZ(i);
-    const k=1+Math.sin(x*260)*0.020+Math.sin(z*231+1.3)*0.018+Math.sin((x+z)*402)*0.012;
-    p.setXYZ(i,x*k,y*(HH/R)*k,z*k);
+    const k=1+Math.sin(x*90)*0.012+Math.sin(z*80+0.7)*0.01;
+    p.setXYZ(i, x*k, y*(HH/R)*k, z*k);
   }
   g.computeVertexNormals();
-  const mound=new THREE.Mesh(g,mMat); mound.position.y=0.0005;
+  const TILE=0.022, uv=new Float32Array(p.count*2);
+  for(let i=0;i<p.count;i++){
+    const x=p.getX(i), y=p.getY(i), z=p.getZ(i), rad=Math.hypot(x,z)||1e-6;
+    // 이음은 카메라 반대편(-Z). 둘레·높이 모두 실제 길이로 깔아 옆면이 늘어지지 않게 한다.
+    const arc=Math.acos(Math.max(-1,Math.min(1,y/HH)))*R;
+    uv[i*2]=Math.atan2(x,z)*rad/TILE;
+    uv[i*2+1]=arc/TILE;
+  }
+  g.setAttribute('uv', new THREE.BufferAttribute(uv,2));
+  g.setAttribute('uv2', new THREE.BufferAttribute(uv.slice(),2));
+  const mMat=new THREE.MeshStandardMaterial({
+    map:heapAlb, normalMap:heapNrm, roughness:0.72, metalness:0,
+    normalScale:new THREE.Vector2(1.05,1.05), envMapIntensity:0.08, color:0xfff7f0
+  });
+  const mound=new THREE.Mesh(g,mMat); mound.position.y=0.0002;
   mound.castShadow=mound.receiveShadow=true; gMound.add(mound);
 
   const cc=document.createElement('canvas'); cc.width=cc.height=128;
@@ -5721,56 +5736,92 @@ let silkThread=null, silkGrains=[];
     new THREE.MeshBasicMaterial({map:T(cc,false),transparent:true,depthWrite:false,opacity:0.8}));
   contact.rotation.x=-Math.PI/2; contact.position.y=0.00045; gMound.add(contact);
 
-  function heap(geo, mat, n, loose, chalk){
-    const inst=new THREE.InstancedMesh(geo, mat, n+loose);
-    // 더미 알 그림자까지 낱알로 찍으면 휴대전화가 버거워진다. 더미 덩어리와 쟁반이 그림자를 받고, 흩어진 알만 낱알 그림자를 낸다.
-    inst.count=n+loose; inst.castShadow=false; inst.receiveShadow=true;
-    const M=new THREE.Matrix4(), Q=new THREE.Quaternion(), E=new THREE.Euler(),
-          P=new THREE.Vector3(), S=new THREE.Vector3(), col=new THREE.Color();
-    for(let i=0;i<n;i++){
-      const a=rnd()*6.283, u=rnd(), st=Math.sqrt(1-u*u);
-      const nx=Math.cos(a)*st*(HH/R), nz=Math.sin(a)*st*(HH/R), nl=Math.hypot(nx,u,nz)||1;
-      P.set(Math.cos(a)*R*st+(rnd()-.5)*0.0024+nx/nl*0.0015,
-            HH*u+0.00115+u/nl*0.0013,
-            Math.sin(a)*R*st+(rnd()-.5)*0.0024+nz/nl*0.0015);
-      const sc=0.86+rnd()*0.26;
-      S.set(sc*(0.92+rnd()*0.12), sc*(0.90+rnd()*0.14), sc*(0.94+rnd()*0.10));
-      E.set((rnd()-.5)*1.15*(1-u)+(1-u)*0.42, rnd()*6.283, (rnd()-.5)*1.25);
-      Q.setFromEuler(E); M.compose(P,Q,S); inst.setMatrixAt(i,M);
-      const w=chalk?(0.82+rnd()*0.1):(0.68+rnd()*0.28);
-      col.setRGB(w, w*(chalk?0.99:0.97), w*(chalk?0.96:0.90));
+  // 겉면 푸아송. 중심 간격이 알 폭보다 좁아지지 않게 해 서로 파고들지 않는다.
+  function poissonShell(rad, hh, minD, maxN){
+    const cell=minD, grid=new Map(), pts=[];
+    const bucket=k=>{ let b=grid.get(k); if(!b){ b=[]; grid.set(k,b); } return b; };
+    let guard=0;
+    while(pts.length<maxN && guard<maxN*50){
+      guard++;
+      const a=rnd()*6.283, u=rnd(), st=Math.sqrt(Math.max(0,1-u*u));
+      const x=Math.cos(a)*rad*st, y=hh*u, z=Math.sin(a)*rad*st;
+      const ix=Math.floor(x/cell), iy=Math.floor(y/cell), iz=Math.floor(z/cell);
+      let ok=true;
+      for(let dx=-1;dx<=1&&ok;dx++) for(let dy=-1;dy<=1&&ok;dy++) for(let dz=-1;dz<=1&&ok;dz++){
+        const nb=grid.get((ix+dx)+','+(iy+dy)+','+(iz+dz));
+        if(!nb) continue;
+        for(const q of nb){
+          const ex=q.x-x, ey=q.y-y, ez=q.z-z;
+          if(ex*ex+ey*ey+ez*ez<minD*minD){ ok=false; break; }
+        }
+      }
+      if(!ok) continue;
+      const pt={x,y,z,u,a};
+      pts.push(pt); bucket(ix+','+iy+','+iz).push(pt);
+    }
+    for(let pass=0;pass<4;pass++){
+      for(const q of pts){
+        let px=0, py=0, pz=0, n=0;
+        const ix=Math.floor(q.x/cell), iy=Math.floor(q.y/cell), iz=Math.floor(q.z/cell);
+        for(let dx=-1;dx<=1;dx++) for(let dy=-1;dy<=1;dy++) for(let dz=-1;dz<=1;dz++){
+          const nb=grid.get((ix+dx)+','+(iy+dy)+','+(iz+dz));
+          if(!nb) continue;
+          for(const o of nb){
+            if(o===q) continue;
+            const ex=q.x-o.x, ey=q.y-o.y, ez=q.z-o.z, d2=ex*ex+ey*ey+ez*ez;
+            if(d2>1e-10 && d2<minD*minD){
+              const d=Math.sqrt(d2), push=(minD-d)/d*0.35;
+              px+=ex*push; py+=ey*push; pz+=ez*push; n++;
+            }
+          }
+        }
+        if(n){ q.x+=px; q.y=Math.max(0,q.y+py); q.z+=pz; }
+      }
+    }
+    return pts;
+  }
+  const up=new THREE.Vector3(0,1,0), nrm=new THREE.Vector3();
+  function lay(pts, geo, mat, sx, sy, sz){
+    const inst=new THREE.InstancedMesh(geo, mat, pts.length);
+    inst.count=pts.length; inst.castShadow=false; inst.receiveShadow=true;
+    const M=new THREE.Matrix4(), Q=new THREE.Quaternion(), twist=new THREE.Quaternion(),
+          align=new THREE.Quaternion(), P=new THREE.Vector3(), S=new THREE.Vector3(), col=new THREE.Color();
+    pts.forEach((q,i)=>{
+      const st=Math.sqrt(Math.max(0,1-q.u*q.u));
+      nrm.set(Math.cos(q.a)*st*(HH/R), q.u, Math.sin(q.a)*st*(HH/R));
+      if(nrm.lengthSq()<1e-8) nrm.set(0,1,0); else nrm.normalize();
+      P.set(q.x, q.y, q.z).addScaledVector(nrm, 0.00045);
+      const j=0.9+rnd()*0.16;
+      S.set(sx*j, sy*j, sz*j);
+      align.setFromUnitVectors(up, nrm);
+      twist.setFromAxisAngle(nrm, rnd()*6.283);
+      Q.multiplyQuaternions(twist, align);
+      M.compose(P,Q,S); inst.setMatrixAt(i,M);
+      const w=0.9+rnd()*0.1;
+      col.setRGB(w, w*0.985, w*0.95);
       inst.setColorAt(i,col);
-    }
-    for(let i=0;i<loose;i++){
-      const a=rnd()*6.283, rr=R+0.001+rnd()*0.016;
-      P.set(Math.cos(a)*rr, 0.00115, Math.sin(a)*rr*0.86);
-      const sc=0.84+rnd()*0.2;
-      S.set(sc, sc*0.95, sc);
-      E.set((rnd()-.5)*0.35, rnd()*6.283, (rnd()-.5)*0.4);
-      Q.setFromEuler(E); M.compose(P,Q,S); inst.setMatrixAt(n+i,M);
-      col.setRGB(0.86,0.83,0.76); inst.setColorAt(n+i,col);
-    }
+    });
     inst.instanceMatrix.needsUpdate=true;
     if(inst.instanceColor) inst.instanceColor.needsUpdate=true;
     gMound.add(inst);
+    return inst;
   }
-  heap(grainWhole, grainMat, 790, 46, false);
-  heap(grainBroken, grainMat, 52, 0, false);
-  heap(grainWhole, grainChalkMat, 28, 6, true);
+  // 겉의 낱알은 얇게만. 길이는 본문 무늬의 알(약 4mm)보다 크지 않고, 두께를 눌러 고치처럼 부풀지 않게 한다.
+  const skin=poissonShell(R*0.995, HH*0.97, 0.0055, 140);
+  lay(skin, grainWhole, grainMat, 0.5, 0.22, 0.34);
 
   // 명주실: 가로로 걸치고 가운데가 제 무게로 처진다. 양 끝은 손이 쥔다
   silkThread=new THREE.Group();
   silkThread.userData.span=0.330;             // 화면 밖까지 뻗는다 (쥔 손은 프레임 밖)
   silkThread.userData.sag=0.052;              // 가운데 처짐
+  // 명주실은 꼬인 무명실이 아니다. 맵의 보풀을 빼고, 결 방향으로만 긴 광택을 둔다.
   const silkMat=new THREE.MeshPhysicalMaterial({
     name:'silk',
-    map:silkAlb, normalMap:silkNrm, roughnessMap:silkRgh,
-    normalScale:new THREE.Vector2(1.15,1.15),
-    color:0xf3e6cc, roughness:1, metalness:0,
-    sheen:0.85, sheenRoughness:0.28, sheenColor:new THREE.Color(0xfff4e2),
-    clearcoat:0.12, clearcoatRoughness:0.35,
-    anisotropy:0.8, anisotropyRotation:0,
-    envMapIntensity:0.55
+    color:0xf4efe4, roughness:0.2, metalness:0,
+    sheen:0.25, sheenRoughness:0.18, sheenColor:new THREE.Color(0xfff8f0),
+    clearcoat:0.4, clearcoatRoughness:0.12,
+    anisotropy:1, anisotropyRotation:0,
+    envMapIntensity:0.9
   });
   silkThread.userData.rebuild=(sag)=>{
     const sp=silkThread.userData.span, pts=[];
@@ -5781,7 +5832,7 @@ let silkThread=null, silkGrains=[];
       const wob=Math.sin(t*47.3)*0.00042+Math.sin(t*19.1+1.7)*0.00028;
       pts.push(new THREE.Vector3(x, -sag*(c0-c)/(c0-1)+wob, Math.sin(t*31.7+0.6)*0.00035));
     }
-    const geo=new THREE.TubeGeometry(new THREE.CatmullRomCurve3(pts),140,0.00052,8,false);
+    const geo=new THREE.TubeGeometry(new THREE.CatmullRomCurve3(pts),120,0.00026,6,false);
     try{ geo.computeTangents(); }catch(e){}
     if(silkThread.userData.line){ silkThread.remove(silkThread.userData.line);
       silkThread.userData.line.geometry.dispose(); }
@@ -5793,10 +5844,22 @@ let silkThread=null, silkGrains=[];
   gRice.add(silkThread);
   for(let i=0;i<10;i++){
     const m=new THREE.Mesh(i%5===4?grainBroken:grainWhole, i%7===6?grainChalkMat:grainMat);
-    const sc=0.92+i*0.014;
+    const sc=0.86+i*0.01;
     m.scale.set(sc, sc*0.96, sc);
     m.castShadow=true; m.visible=false; gRice.add(m); silkGrains.push(m);
   }
+  const ac=document.createElement('canvas'); ac.width=ac.height=64;
+  const ax=ac.getContext('2d');
+  const ag=ax.createRadialGradient(32,32,1,32,32,32);
+  ag.addColorStop(0,'rgba(0,0,0,0.62)');
+  ag.addColorStop(0.42,'rgba(0,0,0,0.28)');
+  ag.addColorStop(1,'rgba(0,0,0,0)');
+  ax.fillStyle=ag; ax.fillRect(0,0,64,64);
+  grainAO=new THREE.InstancedMesh(new THREE.CircleGeometry(1,12),
+    new THREE.MeshBasicMaterial({map:T(ac,false),transparent:true,depthWrite:false,opacity:0.85}), 50);
+  grainAO.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+  grainAO.count=0; grainAO.frustumCulled=false; grainAO.renderOrder=2;
+  gRice.add(grainAO);
 }
 
 function ricePick(){
@@ -5815,6 +5878,7 @@ function riceCam(){
 function clearRice(){
   if(rAnim){ cancelAnimationFrame(rAnim); rAnim=null; }
   rMeshes.forEach(m=>gRice.remove(m)); rMeshes=[]; rBodies=[];
+  if(grainAO){ grainAO.count=0; grainAO.visible=false; }
   silkGrains.forEach(m=>m.visible=false);
   silkThread.visible=false;
 }
@@ -5860,7 +5924,7 @@ function spawnRice(){
       .setDensity(1450).setFriction(.86).setRestitution(.02),b);
     rBodies.push(b);
     // 크기 차이는 그림만. Math.random 을 더 부르지 않아 뿌리는 속도·자리는 그대로다.
-    const gs=0.90+((i*17+3)%100)/700;
+    const gs=0.86+((i*17+3)%80)/1000;
     const m=new THREE.Mesh(i%13===4?grainBroken:grainWhole, i%17===8?grainChalkMat:grainMat);
     m.scale.set(gs, gs*(0.94+((i*5)%7)/90), gs*(0.96+((i*3)%5)/80));
     m.castShadow=m.receiveShadow=true; m.visible=false;
@@ -5878,7 +5942,7 @@ function dipSilk(){
   // 매달릴 자리를 실 위에 미리 잡아 둔다 (가운데로 갈수록 촘촘히)
   silkGrains.forEach((m,i)=>{
     m.userData.u = 0.5 + (i%2?1:-1)*(0.018+Math.floor(i/2)*0.026) + (Math.random()-0.5)*0.012;
-    m.userData.drop = 0.00205+Math.random()*0.00065;
+    m.userData.drop = 0.00178+Math.random()*0.0005;
     m.rotation.set((Math.random()-.5)*0.5, Math.random()*6.283, 1.35+(Math.random()-.5)*0.45);
     m.visible=false;
   });
@@ -5927,10 +5991,26 @@ function releaseRice(){
   buildUI(); riceLoop(rLast);
 }
 
+const _aoM=new THREE.Matrix4(), _aoP=new THREE.Vector3(), _aoQ=new THREE.Quaternion(),
+      _aoS=new THREE.Vector3(), _aoE=new THREE.Euler(-Math.PI/2,0,0);
+_aoQ.setFromEuler(_aoE);
 function syncRice(){
+  let k=0;
   for(let i=0;i<rBodies.length;i++){
     const p=rBodies[i].translation(), q=rBodies[i].rotation();
-    rMeshes[i].position.set(p.x,p.y,p.z); rMeshes[i].quaternion.set(q.x,q.y,q.z,q.w);
+    const m=rMeshes[i];
+    m.position.set(p.x,p.y,p.z); m.quaternion.set(q.x,q.y,q.z,q.w);
+    if(grainAO && m.visible && p.y<0.008 && k<50){
+      const sc=0.0046*(m.scale.x||1);
+      _aoP.set(p.x, 0.0004, p.z);
+      _aoS.set(sc, sc, 1);
+      _aoM.compose(_aoP, _aoQ, _aoS);
+      grainAO.setMatrixAt(k++, _aoM);
+    }
+  }
+  if(grainAO){
+    grainAO.count=k; grainAO.visible=k>0;
+    grainAO.instanceMatrix.needsUpdate=true;
   }
 }
 
