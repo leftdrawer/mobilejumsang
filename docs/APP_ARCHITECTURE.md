@@ -47,7 +47,7 @@ index.html은 하나의 큰 파일이다(약 6,080줄, CRLF, BOM 없음). 줄 �
 
 ## 새 판 알림 (sw.js + 앱) — Kiro (684a464, d2f6074, f2b25b3)
 
-- **sw.js** — 캐시 우선 + 뒤에서 새로 받기. 문서 요청(`mode==='navigate'`)이고 캐시본이 있을 때만, 덮어쓰기 전 캐시본과 새로 받은 본의 SHA-256 을 비교한다. 순서는 `cache.put` → 꼬리(`?…`) 달린 항목 지우기 → 다를 때만 `postMessage({type:'hj-new-version'})`(`clients.matchAll({type:'window',includeUncontrolled:true})`). 처음 설치(캐시 없음)·오프라인·`!res.ok`·해시 같음이면 알리지 않는다. 캐시 이름 `hyudae-jeomsang` 고정.
+- **sw.js** — 캐시 우선 + 뒤에서 새로 받기. 문서 요청(`mode==='navigate'`)이고 캐시본이 있을 때만, 덮어쓰기 전 캐시본과 새로 받은 본의 SHA-256 을 비교한다. 순서는 `cache.put` → 꼬리(`?…`) 달린 항목 지우기 → 다를 때만 `postMessage({type:'hj-new-version'})`(`clients.matchAll({type:'window',includeUncontrolled:true})`). 처음 설치(캐시 없음)·오프라인·`!res.ok`·해시 같음이면 알리지 않는다. 캐시 이름은 판이 바뀔 때 올린다. 지금은 `hyudae-jeomsang-1.3.6`.
 - **수신기** — 마지막 `<script>`의 `navigator.serviceWorker` message 수신기가 `window.__hjNewVer=true`를 세우고 `window.__hjUpd`(= `updNotice`)를 부른다. 앱이 아직 준비 전이면 깃발만 남는다.
 - **`updNotice()`** — 보일 조건: `__hjNewVer && __ready===true && screen==='home' && !edit` 이고 점 치는 중 아님(`mode==='fly'`·`rMode==='fly'`·`yjMode==='spin'`·`stMode==='shake'`·`flagBusy` 모두 아님). `#updnote`(`.toast.upd`, role=status, aria-live=polite) 하나를 만들어 두고 `hidden`·`.on`만 켜고 끈다. 안의 `<button type="button">` 글은 "새 판을 받았습니다. 짚으면 바꿉니다", 누르면 `location.reload()`. 저절로 새로고침하지 않는다.
 - 부르는 곳: buildUI 끝, `window.__ready=true` 직후, 깃발 연출 끝(`draw(); flagBusy=false; updNotice();`, 깃발만 연출 끝에 buildUI 를 안 부르기 때문).
@@ -106,7 +106,7 @@ index.html은 하나의 큰 파일이다(약 6,080줄, CRLF, BOM 없음). 줄 �
 - 엽전: 상평통보 당일전 7닢. 지름 24mm(`R_C=0.012`). 두께는 `2*H_C=1.5mm`(v1.3.3, 실측 1.3–1.6mm에서 고름. 출처는 CHANGELOG). 겹침이면 그 사슬의 닢을 모두 버린다(은호당 법식). **맞추려 던지는 조건·반지름을 바꾸지 말 것.** 판정(`judge`)은 세 가지를 같이 본다. (1) 수평 중심 &lt; `1.94*R_C` 이면 둘 다. (2) 같은 원기둥의 GJK 간격이 0.4mm 이하면 닿은 것으로 보고 둘 다, 사슬이면 전부. (3) 기울기 &gt; 15° 인데 다른 닢에 닿지 않으면 그 닢만. 1.5mm로도 상판 침투가 약 1.4mm라 `syncCoins()`가 그리기 위치만 들어 올린다. 메시 겉크기는 충돌체와 같다. v1.3.3, 같은 씨앗 2000회: 홀 55.7%, 앞면 50.4%, 6닢 10회(모두 혼자 기운 닢).
 - v1.3.1: 상·엽전 맵은 `assets/*.webp`(Cycles). 충돌체는 원기둥 `cylinder(H_C, R_C)` 그대로. 메시가 파고들어 보이지 않게 `syncCoins()`가 **그리기 위치만** 고친다(상판 위로, 수평 거리 &lt; `1.94*R_C` 인 쌍은 쌓음). 판정은 강체 좌표를 본다. 멎으면 `setLinvel`/`setAngvel`의 wakeUp 은 false 로 속도를 0으로 하고 `sleep()`.
 - 오방기: 오방기/칠방기, 지도로 신줄 선택. 원단은 받은 사진 그대로(자르거나 늘리지 않음).
-- 요미산: 명주실(현수선, 0~10 균등)/화상점(1~50). 결과는 알 수·홀짝. 개수·물리·담그는 곡선은 그림 작업에서 바꾸지 않는다. 쌀알 충돌체는 캡슐이고 긴 축을 메시에 맞춘다(아래 지뢰). v1.3.5 그림은 `assets/rice_*.webp`·`assets/silk_*.webp`·`assets/rice_grains.json`·`assets/rice_plate.webp`. 요미산 기본·명주실 카메라의 더미는 그 카메라로 구운 판이고, 실과 매달린 알은 실시간이다. 화상점은 실시간 낱알이다. 쟁반은 엽전과 같은 `dark_wood` 이고, 요미산 윗면만 색을 맞춘다. 크기는 예전 쟁반이다.
+- 요미산: 명주실(현수선, 0~10 균등)/화상점(1~50). 결과는 알 수·홀짝. 개수·물리·담그는 곡선은 그림 작업에서 바꾸지 않는다. 쌀알 충돌체는 캡슐이고 긴 축을 메시에 맞춘다(아래 지뢰). v1.3.6 그림은 `assets/rice_*.webp`·`assets/silk_*.webp`·`assets/rice_grains.json`·`assets/rice_plate.webp`. 요미산 기본·명주실 카메라의 더미는 그 카메라로 구운 판이고, 실과 매달린 알은 실시간이다. 화상점은 실시간 낱알이다. 쌀은 깨끗한 상아색이다. 쟁반은 엽전과 같은 `dark_wood` 이고, 요미산 윗면만 더 어두운 호두색으로 누른다. 엽전 상은 그대로다. 크기는 예전 쟁반이다.
 
 ## 밟은 지뢰 (앱 코드)
 

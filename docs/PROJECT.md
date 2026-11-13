@@ -37,7 +37,7 @@
 
 - `index.html` (약 6MB, LF·BOM 없음) — 앱 전체. Three.js·Rapier IIFE 번들 + 앱 스크립트 + 글꼴·첫 화면(base64 인라인).
 - `manifest.webmanifest` — standalone, orientation portrait.
-- `sw.js` — 서비스 워커. 캐시 우선 + 뒤에서 새 판 받기(stale-while-revalidate). 뒤에서 받은 index.html 이 캐시본과 다르면(SHA-256) 열린 화면에 알린다. 캐시 이름 `hyudae-jeomsang` 고정.
+- `sw.js` — 서비스 워커. 캐시 우선 + 뒤에서 새 판 받기(stale-while-revalidate). 뒤에서 받은 index.html 이 캐시본과 다르면(SHA-256) 열린 화면에 알린다. 캐시 이름은 판이 바뀔 때 올린다. 지금은 `hyudae-jeomsang-1.3.6`.
 - `icon-*.png` (4개) — 홈 화면 아이콘 (은호당님 제작).
 - `docs/` — 이 문서 폴더.
 

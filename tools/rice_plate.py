@@ -11,16 +11,16 @@ ROOT = '/agent/repos/mobilejumsang'
 bpy.ops.wm.read_factory_settings(use_empty=True)
 scene = bpy.context.scene
 scene.render.engine = 'CYCLES'
-scene.cycles.samples = 64
+scene.cycles.samples = 48
 scene.cycles.use_denoising = False
 try:
     scene.cycles.device = 'CPU'
 except Exception:
     pass
-# 첫 화면과 같이 하이라이트가 하얗게 날지 않고 따뜻한 상아색에 머문다.
+# 생쌀은 누런 베이지가 아니다. 거의 흰 상아색이고, 그림자는 회색빛 갈색이다.
 scene.view_settings.view_transform = 'AgX'
 scene.view_settings.look = 'None'
-scene.view_settings.exposure = -0.62
+scene.view_settings.exposure = -0.40
 scene.render.resolution_x = 1784
 scene.render.resolution_y = 824
 scene.render.resolution_percentage = 100
@@ -67,9 +67,9 @@ def area(name, energy, color, size, loc):
     c.up_axis = 'UP_Y'
     return ob
 
-# 따뜻한 키는 왼쪽 위에서, 그림자는 쟁반 앞쪽으로 길게 떨어진다.
-area('key', 4.6, (1.0, 0.78, 0.52), 0.10, (-0.10, 0.24, 0.02))
-area('fill', 0.85, (1.0, 0.86, 0.70), 0.48, (0.16, 0.12, 0.18))
+# 키는 아주 약한 온기만. 주황 빛이면 쌀이 베이지로, 나무가 붉게 물든다.
+area('key', 4.8, (1.0, 0.90, 0.64), 0.12, (-0.10, 0.24, 0.02))
+area('fill', 1.2, (0.97, 0.94, 0.90), 0.55, (0.16, 0.12, 0.18))
 
 # 쟁반 200×145×16mm, 윗면 y=0
 wood = bpy.data.materials.new('wood')
@@ -83,11 +83,18 @@ tex = nt.nodes.new('ShaderNodeTexImage')
 img = bpy.data.images.load(ROOT + '/assets/wood_top_albedo.webp')
 tex.image = img
 hsv = nt.nodes.new('ShaderNodeHueSaturation')
-hsv.inputs['Hue'].default_value = 0.48
-hsv.inputs['Saturation'].default_value = 1.15
-hsv.inputs['Value'].default_value = 0.32
+# 붉은 스캔을 눌러 어두운 호두색으로. 채도를 빼고 조금 어둡게.
+hsv.inputs['Hue'].default_value = 0.50
+hsv.inputs['Saturation'].default_value = 0.88
+hsv.inputs['Value'].default_value = 0.33
 nt.links.new(tex.outputs['Color'], hsv.inputs['Color'])
-nt.links.new(hsv.outputs['Color'], bsdf.inputs['Base Color'])
+# 채도를 뺀 뒤 파랑을 더 눌러 호두색으로 둔다.
+bal = nt.nodes.new('ShaderNodeMixRGB')
+bal.blend_type = 'MULTIPLY'
+bal.inputs['Fac'].default_value = 1.0
+bal.inputs['Color2'].default_value = (0.88, 0.50, 0.26, 1)
+nt.links.new(hsv.outputs['Color'], bal.inputs['Color1'])
+nt.links.new(bal.outputs['Color'], bsdf.inputs['Base Color'])
 nt.links.new(bsdf.outputs['BSDF'], out.inputs['Surface'])
 bpy.ops.mesh.primitive_cube_add(size=1, location=T(0, -0.008, 0))
 tray = bpy.context.active_object
@@ -130,9 +137,9 @@ def rice_mat():
     nt.links.new(tex.outputs['Object'], n1.inputs['Vector'])
     ramp = nt.nodes.new('ShaderNodeValToRGB')
     ramp.color_ramp.elements[0].position = 0.32
-    ramp.color_ramp.elements[0].color = (0.55, 0.36, 0.18, 1)
+    ramp.color_ramp.elements[0].color = (0.74, 0.66, 0.56, 1)
     ramp.color_ramp.elements[1].position = 0.72
-    ramp.color_ramp.elements[1].color = (0.94, 0.68, 0.36, 1)
+    ramp.color_ramp.elements[1].color = (0.98, 0.88, 0.74, 1)
     nt.links.new(n1.outputs['Fac'], ramp.inputs['Fac'])
     # 알마다 밝기가 조금씩 다르다
     oi = nt.nodes.new('ShaderNodeObjectInfo')
@@ -151,8 +158,8 @@ def rice_mat():
     p.inputs['Roughness'].default_value = 0.30
     p.inputs['Specular IOR Level'].default_value = 0.30
     if 'Subsurface Weight' in p.inputs:
-        p.inputs['Subsurface Weight'].default_value = 0.20
-        p.inputs['Subsurface Radius'].default_value = (1.0, 0.86, 0.72)
+        p.inputs['Subsurface Weight'].default_value = 0.16
+        p.inputs['Subsurface Radius'].default_value = (1.0, 0.98, 0.95)
         p.inputs['Subsurface Scale'].default_value = 0.00115
     if 'Sheen Weight' in p.inputs:
         p.inputs['Sheen Weight'].default_value = 0.18
@@ -302,7 +309,7 @@ print('height max', max(grid))
 bed = bpy.data.materials.new('bed')
 bed.use_nodes = True
 bb = bed.node_tree.nodes['Principled BSDF']
-bb.inputs['Base Color'].default_value = (0.40, 0.28, 0.18, 1)
+bb.inputs['Base Color'].default_value = (0.34, 0.32, 0.29, 1)
 bb.inputs['Roughness'].default_value = 0.85
 bpy.ops.mesh.primitive_grid_add(x_subdivisions=48, y_subdivisions=36, size=1, location=(0, 0, 0))
 bed_ob = bpy.context.active_object
@@ -318,18 +325,3 @@ bed_ob.data.materials.append(bed)
 
 bpy.ops.render.render(write_still=True)
 print('rendered', scene.render.filepath)
-
-# 밝은 낱알만 첫 화면 쌀색(sRGB 약 215,186,150)으로 맞춘다. 나무색은 그대로 둔다.
-import subprocess, sys
-subprocess.check_call(['python3', '-c', r'''
-import numpy as np
-from PIL import Image
-p = "/tmp/rice_plate/plate.png"
-im = np.asarray(Image.open(p).convert("RGB")).astype(np.float32)
-lum = im.mean(2)
-w = np.clip((lum - 100.0) / 70.0, 0, 1)[..., None]
-grade = np.array([0.955, 0.915, 0.835], np.float32)
-out = np.clip(im * (1 - w) + im * grade * w, 0, 255).astype(np.uint8)
-Image.fromarray(out).save(p)
-print("graded", out.shape)
-'''])
