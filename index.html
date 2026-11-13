@@ -4486,17 +4486,20 @@ function mkCoinMat(alb,nrm,orm,dead){
     map:alb, normalMap:nrm, roughnessMap:orm, metalnessMap:orm,
     normalScale:new THREE.Vector2(1.25,-1.25),
     metalness:1, roughness:1,
-    envMapIntensity:dead?0.32:1.35,
-    color:dead?0x6a6864:0xffffff
+    envMapIntensity:dead?0.45:1.45,
+    color:dead?0x9a7848:0xffffff
   });
 }
-const rimLive=new THREE.MeshStandardMaterial({color:0xa68446,metalness:.94,roughness:.34,envMapIntensity:1.15});
-const rimDead=new THREE.MeshStandardMaterial({color:0x5a5854,metalness:.45,roughness:.62,envMapIntensity:.28});
+const rimLive=new THREE.MeshStandardMaterial({color:0xd4a45a,metalness:.96,roughness:.28,envMapIntensity:1.25});
+const rimDead=new THREE.MeshStandardMaterial({color:0x8a6840,metalness:.55,roughness:.55,envMapIntensity:.4});
 // [0]=앞면(글자), [1]=뒷면, [2]=옆면
 const coinMat =[mkCoinMat(coinFAlb,coinFNrm,coinFOrm,false), mkCoinMat(coinBAlb,coinBNrm,coinBOrm,false), rimLive];
 const coinDead=[mkCoinMat(coinFAlb,coinFNrm,coinFOrm,true),  mkCoinMat(coinBAlb,coinBNrm,coinBOrm,true),  rimDead];
 
-/* ══ 엽전 물리 (검증된 상수. 던지는 조건·충돌체 크기는 홀짝이 바뀌므로 그대로 둔다) ══ */
+/* ══ 엽전 물리
+   옛 주석의 홀 0.508 은 앞면 비율이다(2000회 0.504). 낱개 수가 홀수인 비율은 0.634.
+   포개기만 하면 0.660, 15° 넘은 닢을 버리면서 0.634 가 된다. 맞추려고 상수를 바꾸지 말 것.
+   던지는 조건·충돌체 크기는 그대로 둔다. ══ */
 const R_C=0.012, H_C=0.0006, TRAY_W=0.130, TRAY_D=0.080, WALL=0.16, DT=1/180;
 function coinGeo(){
   // 충돌체는 반지름 R_C, 반높이 H_C 인 원기둥이다. 베벨이 그 밖으로 나가면
@@ -4664,10 +4667,10 @@ function woodBoardMat(alb,nrm,rgh){
   return new THREE.MeshPhysicalMaterial({
     map:alb, normalMap:nrm, roughnessMap:rgh,
     roughness:1, metalness:0,
-    normalScale:new THREE.Vector2(1.15,1.15),
-    clearcoat:0.12, clearcoatRoughness:0.4,
-    anisotropy:0.4, anisotropyRotation:0,
-    envMapIntensity:0.42
+    normalScale:new THREE.Vector2(0.85,0.85),
+    clearcoat:0.06, clearcoatRoughness:0.55,
+    anisotropy:0.62, anisotropyRotation:0,
+    envMapIntensity:0.35
   });
 }
 function makeCoinBoard(g){
@@ -4932,7 +4935,7 @@ function coinShadow(on){
   const sc=key.shadow.camera;
   if(on){
     sc.left=-0.14; sc.right=0.14; sc.top=0.12; sc.bottom=-0.12;
-    key.shadow.bias=-0.00012; key.shadow.normalBias=0.0016;
+    key.shadow.bias=-0.00008; key.shadow.normalBias=0.0004;
   }else{
     sc.left=-1.6; sc.right=1.6; sc.top=1.6; sc.bottom=-1.6;
     key.shadow.bias=-0.0005; key.shadow.normalBias=0;
