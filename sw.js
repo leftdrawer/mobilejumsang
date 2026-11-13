@@ -11,7 +11,21 @@ const FILES = [
   './icon-180.png',
   './icon-192.png',
   './icon-512.png',
-  './icon-maskable-512.png'
+  './icon-maskable-512.png',
+  './assets/wood_top_albedo.webp',
+  './assets/wood_top_normal.webp',
+  './assets/wood_top_rough.webp',
+  './assets/wood_long_albedo.webp',
+  './assets/wood_long_normal.webp',
+  './assets/wood_long_rough.webp',
+  './assets/wood_end_albedo.webp',
+  './assets/wood_end_rough.webp',
+  './assets/coin_front_albedo.webp',
+  './assets/coin_front_normal.webp',
+  './assets/coin_front_orm.webp',
+  './assets/coin_back_albedo.webp',
+  './assets/coin_back_normal.webp',
+  './assets/coin_back_orm.webp'
 ];
 
 self.addEventListener('install', e => {
