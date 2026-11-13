@@ -2,6 +2,7 @@
 
 > index.html 앱 스크립트의 구조를 정리한다. 코드를 고치기 전에 이 문서로 해당 화면의 상수·함수·연결 지점을 먼저 파악한다.
 > 라인 번호는 변경으로 밀리므로 참고용이다. 실제 위치는 grep으로 확인한다.
+> 절 제목의 Kiro 는 그 블록을 처음 만든 이력이다. 은호당님은 이제 Kiro를 쓰지 않는다. 개발은 Grok Bot 조수 Mobilejumsang이 Cursor 클라우드 에이전트의 브랜치와 풀 리퀘스트로 하고, main 병합은 은호당님 승인 후에만 한다.
 
 ## 전체 구조
 
@@ -11,7 +12,7 @@ index.html은 하나의 큰 파일이다(약 6,080줄, CRLF, BOM 없음). 줄 �
 2. HTML 본문 — `#app`, `#gl`(WebGL canvas), `#homeimg`(179줄, 첫 화면 렌더 WebP base64), `.head`, `.ver`, `.back`, `#err` 등.
 3. `<script>` 1 (198~204줄) — `window.__fail`·`window.onerror`. 오류를 `#err`에 띄운다.
 4. `<script>` 2·3 — Three.js(205줄), Rapier(4324줄) IIFE 번들 (미니파이, 한 줄).
-5. **앱 스크립트** `<script>` 4 (4326~6074줄) — `(async function main(){ ... })()`. 원단 `CLOTH` 같은 거대한 base64 상수도 이 안에 있다. **여기가 Kiro의 주 편집 영역.**
+5. **앱 스크립트** `<script>` 4 (4326~6074줄) — `(async function main(){ ... })()`. 원단 `CLOTH` 같은 거대한 base64 상수도 이 안에 있다. 앱 스크립트는 여기서 고친다. 예전에는 Kiro가 이 영역을 맡았고, 지금은 Grok Bot 조수 Mobilejumsang이 Cursor 클라우드 에이전트의 브랜치와 풀 리퀘스트로 고친다. main 병합은 은호당님 승인 후에만 한다.
 6. `<script>` 5 (6075~6080줄) — 서비스 워커 등록과 새 판 메시지 수신기(아래 "새 판 알림").
 
 `<script`/`</script>` 태그는 각 5개다. 앱 스크립트는 "마지막 `(async function main()` ~ 다음 `</script>`"로 떼어 문법 검사한다(맨 마지막 `<script>`가 아니다).
@@ -105,7 +106,7 @@ index.html은 하나의 큰 파일이다(약 6,080줄, CRLF, BOM 없음). 줄 �
 - 엽전: 상평통보 당일전 7닢. 지름 24mm(`R_C=0.012`). 두께는 `2*H_C=1.5mm`(v1.3.3, 실측 1.3–1.6mm에서 고름. 출처는 CHANGELOG). 겹침이면 그 사슬의 닢을 모두 버린다(은호당 법식). **맞추려 던지는 조건·반지름을 바꾸지 말 것.** 판정(`judge`)은 세 가지를 같이 본다. (1) 수평 중심 &lt; `1.94*R_C` 이면 둘 다. (2) 같은 원기둥의 GJK 간격이 0.4mm 이하면 닿은 것으로 보고 둘 다, 사슬이면 전부. (3) 기울기 &gt; 15° 인데 다른 닢에 닿지 않으면 그 닢만. 1.5mm로도 상판 침투가 약 1.4mm라 `syncCoins()`가 그리기 위치만 들어 올린다. 메시 겉크기는 충돌체와 같다. v1.3.3, 같은 씨앗 2000회: 홀 55.7%, 앞면 50.4%, 6닢 10회(모두 혼자 기운 닢).
 - v1.3.1: 상·엽전 맵은 `assets/*.webp`(Cycles). 충돌체는 원기둥 `cylinder(H_C, R_C)` 그대로. 메시가 파고들어 보이지 않게 `syncCoins()`가 **그리기 위치만** 고친다(상판 위로, 수평 거리 &lt; `1.94*R_C` 인 쌍은 쌓음). 판정은 강체 좌표를 본다. 멎으면 `setLinvel`/`setAngvel`의 wakeUp 은 false 로 속도를 0으로 하고 `sleep()`.
 - 오방기: 오방기/칠방기, 지도로 신줄 선택. 원단은 받은 사진 그대로(자르거나 늘리지 않음).
-- 요미산: 명주실(현수선)/화상점. 결과는 알 수·홀짝.
+- 요미산: 명주실(현수선, 0~10 균등)/화상점(1~50). 결과는 알 수·홀짝. 개수·물리·담그는 곡선은 그림 작업에서 바꾸지 않는다. 쌀알 충돌체는 캡슐이고 긴 축을 메시에 맞춘다(아래 지뢰). v1.3.5 그림은 `assets/rice_*.webp`·`assets/silk_*.webp`·`assets/rice_grains.json`(Cycles로 구운 단립종·명주실). 더미는 `InstancedMesh`. 쟁반은 엽전과 같은 `dark_wood` 이고 크기는 예전 쟁반이다.
 
 ## 밟은 지뢰 (앱 코드)
 
@@ -119,4 +120,4 @@ index.html은 하나의 큰 파일이다(약 6,080줄, CRLF, BOM 없음). 줄 �
 
 - 로컬: `python -m http.server 8080` (repo/에서). 서비스 워커까지 돌게.
 - 디버그 훅: URL에 `?debug` 또는 `#debug`일 때만 노출. `window.__api`(setScreen, drawFlags, spawnCoins/releaseCoins, flagPick, ricePick, state 등), `window.__dbg`, `window.__probe`.
-- "했다·확인했다"는 도구로 실제 확인한 것만. 3D는 Kiro가 직접 못 보므로 스크린샷 의존.
+- "했다·확인했다"는 도구로 실제 확인한 것만. 3D는 스크린샷으로 확인한다.

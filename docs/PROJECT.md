@@ -13,27 +13,29 @@
 
 ## 누가 무엇을 하나
 
-이 프로젝트는 두 AI가 나눠 맡는다.
+은호당님은 이제 Kiro를 쓰지 않는다. 개발은 Grok Bot 조수 **Mobilejumsang**이 Cursor 클라우드 에이전트에서 한다. 작업은 `cursor/…` 브랜치와 풀 리퀘스트로 올리고, **main 에는 은호당님 승인이 있어야** 합친다. main 에 직접 푸시하지 않는다.
 
-| 담당 | 영역 | 작업 위치 |
+아래 표는 예전 나눔이다. 이름은 그때의 이력으로 남긴다.
+
+| 담당 (이력) | 영역 | 작업 위치 |
 |------|------|-----------|
 | **Kiro** | 앱 로직 (index.html 안의 앱 스크립트) | `repo/` 클론, `main` 브랜치 |
 | **Claude** | 블렌더 실사 렌더, 에셋 제작, 물리 블록 초안 | `claude/` 클론, `claude/*` 브랜치 + `blender/` |
 
-- **index.html은 Kiro만 편집한다.** Claude는 `blender/`와 자기 브랜치에서만 작업하고, 완성된 블록을 넘겨주면 Kiro가 머지한다.
-- 상위 작업 폴더 구조 (`c:\AI Projects\mobilejumsang\`):
-  - `repo/` — Kiro 클론 (이 폴더)
+- 예전에는 index.html 을 Kiro만 고쳤다. 지금은 Mobilejumsang이 브랜치에서 고치고, 풀 리퀘스트로 은호당님 확인을 받는다.
+- 상위 작업 폴더 구조 (`c:\AI Projects\mobilejumsang\`, 예전 자리):
+  - `repo/` — 예전 Kiro 클론
   - `claude/` — Claude 클론
-  - `blender/` — 블렌더 장면 파일·렌더 결과 (Claude 영역)
+  - `blender/` — 블렌더 장면 파일·렌더 결과 (예전 Claude 영역)
   - `README.md` — 상위 폴더 문서 입구 (꼭 지킬 것, 문서 고치는 규칙)
   - `docs/` — 법식과-화면, 개발-안내, 첫화면-렌더(블렌더 판별 이력), 할일
   - `CLAUDE.md` — Claude 전용 작업 규칙
 
 ## 저장소 구성 (repo/)
 
-파일 7개가 전부다.
+앱은 여전히 `index.html` 하나다. v1.3.1부터 촬영 맵은 `assets/*.webp` 로 나뉘어 있고, 서비스 워커 캐시 목록에 들어 있다.
 
-- `index.html` (약 6.27MB, 약 6,080줄, CRLF·BOM 없음) — 앱 전체. Three.js·Rapier IIFE 번들 + 앱 스크립트 + 모든 에셋(base64 인라인).
+- `index.html` (약 6MB, LF·BOM 없음) — 앱 전체. Three.js·Rapier IIFE 번들 + 앱 스크립트 + 글꼴·첫 화면(base64 인라인).
 - `manifest.webmanifest` — standalone, orientation portrait.
 - `sw.js` — 서비스 워커. 캐시 우선 + 뒤에서 새 판 받기(stale-while-revalidate). 뒤에서 받은 index.html 이 캐시본과 다르면(SHA-256) 열린 화면에 알린다. 캐시 이름 `hyudae-jeomsang` 고정.
 - `icon-*.png` (4개) — 홈 화면 아이콘 (은호당님 제작).
@@ -50,8 +52,8 @@
 | 오방기 (旗) | `flag` | 기를 뽑아 색·신줄을 본다 | 초기(claude.ai) |
 | 엽전 | `coin` | 상평통보 7닢을 던져 홀짝·앞뒤를 본다 | 초기 |
 | 요미산 (쌀) | `rice` | 명주실/화상점으로 쌀알 수를 본다 | 초기 |
-| 주역괘 | `yijing` | 육효 피젯을 돌려 64괘를 얻는다 | **Kiro** |
-| 산통 (算筒) | `santong` | 통을 흔들어 산가지 하나를 뽑고 첨시를 본다 | **Kiro** (v1.1.0, 첨시·법식 감수 전) |
+| 주역괘 | `yijing` | 육효 피젯을 돌려 64괘를 얻는다 | 처음 구현 Kiro (이력) |
+| 산통 (算筒) | `santong` | 통을 흔들어 산가지 하나를 뽑고 첨시를 본다 | 처음 구현 Kiro (v1.1.0, 첨시·법식 감수 전) |
 
 각 점법의 세부 법식·주의사항은 `../../docs/법식과-화면.md`에 있다(`../../CLAUDE.md`의 "화면과 법식" 절이 여기로 옮겼다). **법식·무속 관행은 짐작으로 채우지 않고 은호당님께 묻는다.**
 
@@ -61,16 +63,17 @@
 
 - 버전은 **한 곳**에서 고친다: `APP_VERSION` 상수 (index.html 앱 스크립트 안).
 - `<div class="ver">` 표기는 JS가 `APP_VERSION`으로 덮어쓴다. 스크립트 실패 시 이 정적 값이 보이므로 **둘 다** 같이 올린다.
-- 자리 규칙: 버그 수정 = 끝자리, 기능 추가 = 가운데, 정식 = 1.0. 현재 1.3.x 라인(배포된 판 v1.3.0). 지금 판은 `CHANGELOG.md` 맨 위 항목을 본다.
+- 자리 규칙: 버그 수정 = 끝자리, 기능 추가 = 가운데, 정식 = 1.0. 현재 1.3.x 라인(배포된 판 v1.3.4). 지금 판은 `CHANGELOG.md` 맨 위 항목을 본다.
 - 배포할 때마다 `CHANGELOG.md`에 항목을 추가한다.
 
 ## 작업 흐름 (매 변경마다)
 
-1. index.html 수정 (정확한 문자열 치환).
-2. 문법 검증 — 앱 스크립트를 떼어 `node --check` (아래 참고).
-3. 로컬 확인 — `python -m http.server 8080` 띄우고 브라우저로 본다.
-4. 은호당님 확인 (Kiro는 3D를 직접 못 보므로 스크린샷 의존).
-5. 배포 시 `APP_VERSION`과 `.ver` 둘 다 올리고, `CHANGELOG.md` 갱신, 커밋·`git push origin main`.
+1. `main` 에서 `cursor/…` 브랜치를 만든다. main 에는 바로 올리지 않는다.
+2. index.html 수정 (정확한 문자열 치환).
+3. 문법 검증 — 앱 스크립트를 떼어 `node --check` (아래 참고).
+4. 로컬 확인 — `python -m http.server 8080` 띄우고 브라우저로 본다. 3D는 스크린샷으로 확인한다.
+5. `APP_VERSION`과 `.ver` 둘 다 올리고 `CHANGELOG.md` 를 갱신한 뒤 커밋하고, 브랜치를 푸시해 풀 리퀘스트를 연다.
+6. main 병합은 은호당님 승인 후에만 한다.
 
 ## index.html 다룰 때 주의
 

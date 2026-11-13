@@ -25,7 +25,15 @@ const FILES = [
   './assets/coin_front_orm.webp',
   './assets/coin_back_albedo.webp',
   './assets/coin_back_normal.webp',
-  './assets/coin_back_orm.webp'
+  './assets/coin_back_orm.webp',
+  './assets/rice_albedo.webp',
+  './assets/rice_normal.webp',
+  './assets/rice_rough.webp',
+  './assets/rice_ao.webp',
+  './assets/rice_grains.json',
+  './assets/silk_albedo.webp',
+  './assets/silk_normal.webp',
+  './assets/silk_rough.webp'
 ];
 
 self.addEventListener('install', e => {
