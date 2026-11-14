@@ -3,7 +3,7 @@
         그래서 쓰는 사람은 아무것도 안 해도 다음에 열 때 새 판이 뜬다.
         뒤에서 받은 index.html 이 캐시본과 다르면(SHA-256) 열린 화면에 알려 바로 다시 열 수 있게 한다.
         그림이 바뀌면 아래 캐시 이름을 올려 옛 판을 버린다. */
-const CACHE = 'hyudae-jeomsang-1.3.6';
+const CACHE = 'hyudae-jeomsang-1.3.7';
 const FILES = [
   './',
   './index.html',
