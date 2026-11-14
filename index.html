@@ -4326,7 +4326,7 @@ three/build/three.module.js:
 <script>
 (async function main(){
 try{
-const APP_VERSION='1.3.8';   // 버전은 여기 한 곳에서만 고친다
+const APP_VERSION='1.3.9';   // 버전은 여기 한 곳에서만 고친다
 { const v=document.querySelector('.ver'); if(v) v.textContent='v'+APP_VERSION; }
 const L=document.getElementById('loading');
 const LS=document.getElementById('loadstep');
@@ -5604,14 +5604,14 @@ function judge(){
     p:{x:meshes[i].position.x,y:meshes[i].position.y,z:meshes[i].position.z},
     q:b.rotation(),ti:tiltOf(b.rotation()),f:faceOf(b.rotation())
   }));
-  // 은호당 법식: 그린 자리에서 수평 중심이 1.94*R_C 보다 가까우면 포개진 것.
-  // 기대거나 얹혀 그 쌍이 0.4mm 안으로 닿아 있을 때만 둘 다 버린다. 옆의 버린 닢 때문에 안 버린다.
-  // 사슬은 그렇게 닿은 쌍만 따라간다. 15°를 넘고 다른 닢에 닿지 않은 것만 혼자 버린다.
+  // 실제 화면 메시의 위치와 회전으로 원기둥 표면 간격을 계산한다.
+  // 수평 중심 거리만으로는 높이 차나 기울기를 무시해 떨어져 보이는 닢도 겹침 처리한다.
+  // 서로 0.4mm 안으로 닿은 쌍만 둘 다 버리고, 사슬은 그렇게 닿은 쌍만 따라간다.
+  // 15°를 넘고 다른 닢에 닿지 않은 것만 혼자 버린다.
   const up=P.map(o=>o.ti>15);
   touchLinks=[];
   for(let i=0;i<7;i++)for(let j=i+1;j<7;j++){
-    const d=Math.hypot(P[i].p.x-P[j].p.x, P[i].p.z-P[j].p.z);
-    const hit=d<1.94*R_C || coinsTouch(P[i], P[j]);
+    const hit=coinsTouch(P[i], P[j]);
     if(!hit) continue;
     up[i]=true; up[j]=true;
     touchLinks.push([i,j]);
