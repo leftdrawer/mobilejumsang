@@ -37,7 +37,7 @@
 
 - `index.html` (약 6MB, LF·BOM 없음) — 앱 전체. Three.js·Rapier IIFE 번들 + 앱 스크립트 + 글꼴·첫 화면(base64 인라인).
 - `manifest.webmanifest` — standalone, orientation portrait.
-- `sw.js` — 서비스 워커. 캐시 우선 + 뒤에서 새 판 받기(stale-while-revalidate). 뒤에서 받은 index.html 이 캐시본과 다르면(SHA-256) 열린 화면에 알린다. 캐시 이름은 판이 바뀔 때 올린다. 지금은 `hyudae-jeomsang-1.3.7`.
+- `sw.js` — 서비스 워커. 캐시 우선 + 뒤에서 새 판 받기(stale-while-revalidate). 뒤에서 받은 index.html 이 캐시본과 다르면(SHA-256) 열린 화면에 알린다. 캐시 이름은 판이 바뀔 때 올린다. 현재 작업 판은 `hyudae-jeomsang-1.3.10`.
 - `icon-*.png` (4개) — 홈 화면 아이콘 (은호당님 제작).
 - `docs/` — 이 문서 폴더.
 
@@ -63,7 +63,7 @@
 
 - 버전은 **한 곳**에서 고친다: `APP_VERSION` 상수 (index.html 앱 스크립트 안).
 - `<div class="ver">` 표기는 JS가 `APP_VERSION`으로 덮어쓴다. 스크립트 실패 시 이 정적 값이 보이므로 **둘 다** 같이 올린다.
-- 자리 규칙: 버그 수정 = 끝자리, 기능 추가 = 가운데, 정식 = 1.0. 현재 1.3.x 라인(배포된 판 v1.3.4). 지금 판은 `CHANGELOG.md` 맨 위 항목을 본다.
+- 자리 규칙: 버그 수정 = 끝자리, 기능 추가 = 가운데, 정식 = 1.0. 현재 1.3.x 라인. 배포된 판과 미배포 작업은 `CHANGELOG.md` 맨 위 항목을 본다.
 - 배포할 때마다 `CHANGELOG.md`에 항목을 추가한다.
 
 ## 작업 흐름 (매 변경마다)
