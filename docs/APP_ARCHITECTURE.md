@@ -60,7 +60,7 @@ index.html은 하나의 큰 파일이다(약 6,080줄, CRLF, BOM 없음). 줄 �
 
 - 씬 그룹 `gYijing`. 세로축을 Y축 회전으로 바꾼 6개 육효 막대(피젯).
 - **`startYijing()`** — 진입·대기(여러 번 호출 안전). **`spinYijing()`** — 튕겨 돌리고 멈춰 판정.
-- **`YJ64`** — 64괘 KingWen 순서 데이터. **`YJ_TEXT`** — 괘별 한자 괘명 + 풀이(Kiro 초안, 은호당님 감수 대상).
+- **`YJ64`** — 64괘 KingWen 순서 데이터. 열쇠는 `하괘코드*8+상괘코드`. 코드의 상위 비트가 아래 효다(001=간). **`yjLookup`** 도 같은 순서로 읽는다. **`YJ_TEXT`** — 괘별 한자 괘명 + 풀이(Kiro 초안, 은호당님 감수 대상).
 - 괘명 한자는 **Iansui**(위 "글꼴", 82자 서브셋, `font-display:swap`)로 `.yjhanja`에 그린다.
 - 동효 없음(64괘 균등 1/64).
 
@@ -89,7 +89,7 @@ index.html은 하나의 큰 파일이다(약 6,080줄, CRLF, BOM 없음). 줄 �
 
 ### 연결 지점
 - `CAMS.santong = {pos:[0,0.055,0.235], look:[0,0.045,0]}`.
-- buildUI 첫머리: `gSantong.visible=(screen==='santong'); if(screen!=='santong'&&stAnim){cancelAnimationFrame(stAnim);stAnim=null;}`
+- buildUI 첫머리: `gSantong.visible=(screen==='santong')`. 산통 화면이 아니면 애니메이션을 끊고, `stMode==='shake'` 이면 `idle` 로 되돌린다. 흔들다 나가도 새 판 알림이 막히지 않게.
 - 첫 화면 진입: `else if(k==='santong'){ setScreen('santong'); startSantong(); }`
 - pointerdown: `if(screen==='santong'){ if(stMode==='idle'||stMode==='done') shakeSantong(); return; }`
 - buildUI 분기: `} else if(screen==='santong'){` — 제목 "산통". 안내는 `stMode`별: idle "점상을 짚어 산통을 흔드십시오", shake "산가지가 나오는 중입니다", done 이면 verdict에 "제 n수 + 등급 + 첨시(yjnote 클래스)".
