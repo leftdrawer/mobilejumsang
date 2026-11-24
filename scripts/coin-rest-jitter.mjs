@@ -174,8 +174,8 @@ function speedOf(b) {
 
 // 낮은 속도가 이 시간 이어지면 "처음 멈춤". 그 뒤 프레임만 잔떨림으로 센다.
 const REST_HOLD = 0.12;
-const REST_LIN = 0.012;
-const REST_ANG = 1.2;
+const REST_LIN = 0.003;
+const REST_ANG = 0.05;
 const HIT_SPEED = 0.05;
 
 function runToss(kind, seed) {
@@ -206,19 +206,17 @@ function runToss(kind, seed) {
     bodies.forEach((b, i) => {
       b.setGravityScale(1, true);
       b.setTranslation({
-        x: (rnd() - 0.5) * 0.0016,
-        y: 0.018 + i * 0.0036,
-        z: (rnd() - 0.5) * 0.0016,
+        x: (i - 3) * 0.00005 + (rnd() - 0.5) * 0.00004,
+        y: 0.004 + i * 0.004,
+        z: (rnd() - 0.5) * 0.00004,
       }, true);
-      const tilt = (rnd() - 0.5) * 0.5;
-      const h = tilt / 2;
-      b.setRotation({ x: 0, y: 0, z: Math.sin(h), w: Math.cos(h) }, true);
-      b.setLinvel({ x: (rnd() - 0.5) * 0.04, y: 0.02 + rnd() * 0.08, z: (rnd() - 0.5) * 0.04 }, true);
-      b.setAngvel({ x: (rnd() - 0.5) * 8, y: (rnd() - 0.5) * 4, z: (rnd() - 0.5) * 8 }, true);
+      b.setRotation({ x: 0, y: 0, z: 0, w: 1 }, true);
+      b.setLinvel({ x: 0, y: 0, z: 0 }, true);
+      b.setAngvel({ x: 0, y: (rnd() - 0.5) * 0.4, z: 0 }, true);
     });
   } else {
     // 바닥에 놓인 닢의 테에 다른 닢을 기대 둔다. 나머지는 근처로 떨어뜨린다.
-    const lean = 32 * Math.PI / 180;
+    const lean = 42 * Math.PI / 180;
     bodies.forEach((b, i) => {
       b.setGravityScale(1, true);
       if (i === 0) {
@@ -231,9 +229,9 @@ function runToss(kind, seed) {
         b.setRotation({ x: 0, y: 0, z: Math.sin(h), w: Math.cos(h) }, true);
         const ny = Math.abs(Math.cos(lean));
         const half = H_C * ny + R_C * Math.sqrt(Math.max(0, 1 - ny * ny));
-        b.setTranslation({ x: 0.0145, y: half + 0.0003, z: (rnd() - 0.5) * 0.001 }, true);
-        b.setLinvel({ x: -0.02, y: -0.01, z: 0 }, true);
-        b.setAngvel({ x: 0, y: (rnd() - 0.5) * 2, z: 0.4 }, true);
+        b.setTranslation({ x: 0.008, y: half, z: (rnd() - 0.5) * 0.0002 }, true);
+        b.setLinvel({ x: 0, y: 0, z: 0 }, true);
+        b.setAngvel({ x: 0, y: 0, z: 0 }, true);
       } else {
         const a = rnd() * Math.PI * 2;
         b.setTranslation({
@@ -255,6 +253,7 @@ function runToss(kind, seed) {
   let rendered = null;
   const restFor = new Array(7).fill(0);
   const atRest = new Array(7).fill(false);
+  const restFramesSeen = new Array(7).fill(0);
   const maxPos = new Array(7).fill(0);
   const maxRot = new Array(7).fill(0);
   const maxPosAll = new Array(7).fill(0);
@@ -283,6 +282,15 @@ function runToss(kind, seed) {
       acc -= COIN_DT;
       t += COIN_DT;
     }
+    // 앱 루프와 같이, 8초가 지나도 남으면 프레임마다 한 번 살며시 제동한다.
+    if (t > 8) {
+      for (const b of bodies) {
+        if (b.gravityScale() < 0.5) continue;
+        const v = b.linvel(), w = b.angvel();
+        b.setLinvel({ x: v.x * 0.94, y: v.y, z: v.z * 0.94 }, false);
+        b.setAngvel({ x: w.x * 0.92, y: w.y * 0.92, z: w.z * 0.92 }, false);
+      }
+    }
     const coinCurr = clonePose(bodies);
     const alpha = Math.min(1, Math.max(0, acc / Math.max(COIN_DT, 1e-8)));
     const draw = renderPose(coinPrev, coinCurr, alpha);
@@ -292,29 +300,26 @@ function runToss(kind, seed) {
       for (let i = 0; i < bodies.length; i++) {
         const dp = Math.hypot(draw[i].x - rendered[i].x, draw[i].y - rendered[i].y, draw[i].z - rendered[i].z);
         const da = quatAngle(draw[i].q, rendered[i].q);
-        const moving = prevSpeed[i].lin > REST_LIN || prevSpeed[i].ang > REST_ANG
-          || nowSpeed[i].lin > REST_LIN || nowSpeed[i].ang > REST_ANG;
-        if (moving) {
-          restFor[i] = 0;
-          if (atRest[i] && (prevSpeed[i].lin > HIT_SPEED || nowSpeed[i].lin > HIT_SPEED)) {
-            // 다시 빨라지면, 옆 닢이 실제로 닿아 들어온 경우만 맞음으로 본다.
+        const wasRest = atRest[i];
+        const asleep = bodies[i].gravityScale() < 0.5 || bodies[i].isSleeping();
+        if (!asleep) {
+          if (atRest[i]) {
             let hit = false;
             for (let j = 0; j < bodies.length; j++) if (j !== i) {
               const p = bodies[i].translation(), q = bodies[j].translation();
               const near = Math.hypot(p.x - q.x, p.y - q.y, p.z - q.z) < R_C * 2 + 0.004;
-              if (near && (prevSpeed[j].lin > HIT_SPEED || nowSpeed[j].lin > HIT_SPEED || prevSpeed[i].lin > HIT_SPEED)) hit = true;
+              if (near && (prevSpeed[j].lin > HIT_SPEED || nowSpeed[j].lin > HIT_SPEED)) hit = true;
             }
-            if (hit) {
-              atRest[i] = false;
-              hitFrames++;
-            }
+            if (hit) hitFrames++;
           }
+          atRest[i] = false;
+          anyAwake = true;
+          restFramesSeen[i] = 0;
         } else {
-          restFor[i] += dt;
-          if (!atRest[i] && restFor[i] >= REST_HOLD) atRest[i] = true;
+          atRest[i] = true;
+          restFramesSeen[i]++;
         }
-        if (!atRest[i]) anyAwake = true;
-        if (atRest[i]) {
+        if (wasRest && atRest[i] && restFramesSeen[i] > 3) {
           const mm = dp * 1000;
           const deg = da * 180 / Math.PI;
           maxPos[i] = Math.max(maxPos[i], mm);
@@ -335,14 +340,18 @@ function runToss(kind, seed) {
   const pose = bodies.map(b => ({ p: b.translation(), q: b.rotation(), ti: tiltDeg(b.rotation()), sp: speedOf(b) }));
   let stacked = 0, leaning = 0, heads = 0;
   for (let i = 0; i < pose.length; i++) {
-    if (nyOf(pose[i].q) > 0 && (1 - 2 * (pose[i].q.x ** 2 + pose[i].q.z ** 2)) > 0) heads++;
-    for (let j = i + 1; j < pose.length; j++) {
+    if ((1 - 2 * (pose[i].q.x ** 2 + pose[i].q.z ** 2)) > 0) heads++;
+    let group = 1, y0 = pose[i].p.y, y1 = pose[i].p.y;
+    for (let j = 0; j < pose.length; j++) if (j !== i) {
       const dx = pose[i].p.x - pose[j].p.x, dy = pose[i].p.y - pose[j].p.y, dz = pose[i].p.z - pose[j].p.z;
-      const dh = Math.hypot(dx, dz);
-      if (Math.abs(dy) > 0.001 && dh < R_C * 0.85 && pose[i].ti < 20 && pose[j].ti < 20) stacked++;
-      const near = Math.hypot(dx, dy, dz) < R_C * 2.05;
-      if (near && (pose[i].ti > 12 || pose[j].ti > 12)) leaning++;
+      if (Math.hypot(dx, dz) < 0.016 && pose[i].ti < 25 && pose[j].ti < 25) {
+        group++;
+        y0 = Math.min(y0, pose[j].p.y);
+        y1 = Math.max(y1, pose[j].p.y);
+      }
+      if (pose[i].ti > 12 && pose[i].ti < 75 && Math.hypot(dx, dy, dz) < R_C * 2.3) leaning++;
     }
+    if (group >= 2 && y1 - y0 > 0.0012) stacked++;
   }
   let escaped = 0, minLow = Infinity;
   for (const o of pose) {
@@ -353,7 +362,7 @@ function runToss(kind, seed) {
   const slept = bodies.filter(b => b.isSleeping() || b.gravityScale() < 0.5).length;
   world.free();
   return {
-    kind,
+    kind, seed,
     maxPos: Math.max(...maxPos),
     maxRot: Math.max(...maxRot),
     maxPoke: Math.max(...pokeMm),
@@ -381,6 +390,11 @@ for (let i = 0; i < N; i++) {
 const rows = [];
 const t0 = performance.now();
 for (let i = 0; i < N; i++) rows.push(runToss(kinds[i], SEED0 + i * 997));
+for (const r of rows) {
+  if (r.maxPos > POS_MM || r.maxRot > ROT_DEG) {
+    console.error('OUT', JSON.stringify({ kind: r.kind, seed: r.seed, maxPos: r.maxPos, maxRot: r.maxRot, timedOut: r.timedOut, still: r.stillMoving }));
+  }
+}
 const wall = (performance.now() - t0) / 1000;
 
 const num = k => rows.map(r => r[k]).sort((a, b) => a - b);
