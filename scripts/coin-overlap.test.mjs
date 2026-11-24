@@ -8,7 +8,7 @@ import vm from 'node:vm';
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
 const html = readFileSync(join(root, 'index.html'), 'utf8');
-const syncStart = html.indexOf('function syncCoins(){');
+const syncStart = html.indexOf('function syncCoins(alpha){');
 const tiltStart = html.indexOf('const tiltOf=q=>');
 const geometryStart = html.indexOf('const axisOf = q => {');
 const judgeStart = html.indexOf('function judge(){');

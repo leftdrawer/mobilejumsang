@@ -90,9 +90,10 @@ assert.match(flags, /const bag=SET\.map\(f=>f\[0\]\)/);
 const judge = between('function judge(){', 'function syncTouchLine(){');
 assert.match(judge, /parityCount=allCoinsOverlapped\?P\.length:cleanCount/);
 
-assert.match(html, /const APP_VERSION='1\.3\.12'/);
-assert.match(html, /<div class="ver">v1\.3\.12<\/div>/);
-assert.match(sw, /const CACHE = 'hyudae-jeomsang-1\.3\.12'/);
+const ver = html.match(/const APP_VERSION='([^']+)'/);
+assert.ok(ver, 'APP_VERSION');
+assert.match(html, new RegExp(`<div class="ver">v${ver[1]}</div>`));
+assert.match(sw, new RegExp(`const CACHE = 'hyudae-jeomsang-${ver[1]}'`));
 
 const scriptTags = html.match(/<script/g) || [];
 const scriptEnds = html.match(/<\/script>/g) || [];
