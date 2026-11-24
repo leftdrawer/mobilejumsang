@@ -141,7 +141,7 @@ function makeCoinWorld() {
   const bodies = [];
   for (let i = 0; i < 7; i++) {
     const b = world.createRigidBody(RAPIER.RigidBodyDesc.dynamic().setTranslation((i - 3) * 0.004, 0.04, 0));
-    world.createCollider(RAPIER.ColliderDesc.cylinder(0.00075, 0.012).setDensity(8700), b);
+    world.createCollider(RAPIER.ColliderDesc.cylinder(0.001, 0.012).setDensity(8700), b);
     bodies.push(b);
   }
   for (let s = 0; s < 20; s++) world.step();

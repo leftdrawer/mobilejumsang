@@ -26,10 +26,10 @@ const EDGE_ON = Object.freeze({ x: 0, y: 0, z: Math.SQRT1_2, w: Math.SQRT1_2 });
 
 function judgeCoins(coins, { syncDisplay = false, padToSeven = true } = {}) {
   const all = coins.slice();
-  while (padToSeven && all.length < 7) all.push({ p: { x: 0.2 + all.length * 0.04, y: 0.00075, z: 0 }, q: IDENTITY });
+  while (padToSeven && all.length < 7) all.push({ p: { x: 0.2 + all.length * 0.04, y: 0.001, z: 0 }, q: IDENTITY });
   const context = {
     R_C: 0.012,
-    H_C: 0.00075,
+    H_C: 0.001,
     TOUCH: 0.0004,
     bodies: all.map(c => ({ rotation: () => c.q, translation: () => c.p })),
     meshes: all.map(c => {
@@ -48,7 +48,7 @@ function judgeCoins(coins, { syncDisplay = false, padToSeven = true } = {}) {
   vm.runInContext('judge()', context);
   return JSON.parse(vm.runInContext('JSON.stringify(__result())', context));
 }
-const coin = (x, y = 0.00075, q = IDENTITY, z = 0) => ({ p: { x, y, z }, q });
+const coin = (x, y = 0.001, q = IDENTITY, z = 0) => ({ p: { x, y, z }, q });
 
 test('close horizontal centers separated in height are not classified as overlap', () => {
   const result = judgeCoins([coin(0), coin(0.020, 0.008)]);
@@ -65,7 +65,7 @@ test('actual flat-cylinder overlap is caught even just beyond the former 1.94R c
 });
 
 test('nearby edge-on coins are not classified by their horizontal centers alone', () => {
-  const result = judgeCoins([coin(0, 0.00075, EDGE_ON), coin(0.020, 0.00075, EDGE_ON)]);
+  const result = judgeCoins([coin(0, 0.012, EDGE_ON), coin(0.020, 0.012, EDGE_ON)]);
   assert.deepEqual(result.links, []);
 });
 
