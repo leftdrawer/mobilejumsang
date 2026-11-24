@@ -353,6 +353,21 @@ function runToss(kind, seed) {
     }
     if (group >= 2 && y1 - y0 > 0.0012) stacked++;
   }
+  // 평평하게 포개진 쌍의 면 간격이 0.4mm 안이면 겹침 사슬. 일곱이 한 사슬이면 7(홀).
+  const parent = pose.map((_, i) => i);
+  const find = x => parent[x] === x ? x : (parent[x] = find(parent[x]));
+  for (let i = 0; i < pose.length; i++) for (let j = i + 1; j < pose.length; j++) {
+    if (pose[i].ti > 20 || pose[j].ti > 20) continue;
+    const dx = pose[i].p.x - pose[j].p.x, dy = pose[i].p.y - pose[j].p.y, dz = pose[i].p.z - pose[j].p.z;
+    if (Math.hypot(dx, dz) >= 2 * R_C) continue;
+    if (Math.abs(dy) - 2 * H_C <= 0.0004) parent[find(i)] = find(j);
+  }
+  const comp = {};
+  for (let i = 0; i < pose.length; i++) {
+    const r = find(i);
+    comp[r] = (comp[r] || 0) + 1;
+  }
+  const allSevenOdd = Math.max(...Object.values(comp)) === pose.length;
   let escaped = 0, minLow = Infinity;
   for (const o of pose) {
     const low = o.p.y - (H_C * nyOf(o.q) + R_C * Math.sqrt(Math.max(0, 1 - Math.min(1, nyOf(o.q) ** 2))));
@@ -371,6 +386,7 @@ function runToss(kind, seed) {
     hitFrames,
     stacked,
     leaning,
+    allSevenOdd,
     heads,
     escaped,
     minLow,
@@ -433,6 +449,8 @@ const report = {
   timedOut: rows.filter(r => r.timedOut).length,
   stackedThrows: rows.filter(r => r.stacked > 0).length,
   leaningThrows: rows.filter(r => r.leaning > 0).length,
+  stackAllSevenOdd: rows.filter(r => r.kind === 'stack' && r.allSevenOdd).length,
+  stackThrows: rows.filter(r => r.kind === 'stack').length,
   slept_avg: sum('slept') / N,
   heads: sum('heads') / (N * 7),
   lowest_mm: Math.min(...rows.map(r => r.minLow)) * 1000,
@@ -446,6 +464,10 @@ if (report.rendered_rot_deg.max >= ROT_DEG) fail.push(`그린 회전 최대 ${re
 if (report.escaped) fail.push(`상 밖 ${report.escaped}`);
 if (report.stackedThrows < 1) fail.push('쌓인 결과가 없습니다');
 if (report.leaningThrows < 1) fail.push('기댄 결과가 없습니다');
+const stackRows = rows.filter(r => r.kind === 'stack');
+const stackOdd = stackRows.filter(r => r.allSevenOdd).length;
+report.stackAllSevenOdd = stackOdd;
+if (stackRows.length && stackOdd < stackRows.length) fail.push(`일곱 포개 홀 ${stackOdd}/${stackRows.length}`);
 if (ASSERT && fail.length) {
   console.error('FAIL ' + fail.join('; '));
   process.exit(1);
