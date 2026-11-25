@@ -97,8 +97,13 @@ assert.match(sw, new RegExp(`const CACHE = 'hyudae-jeomsang-${ver[1]}'`));
 
 const scriptTags = html.match(/<script/g) || [];
 const scriptEnds = html.match(/<\/script>/g) || [];
-assert.equal(scriptTags.length, 5);
-assert.equal(scriptEnds.length, 5);
+assert.equal(scriptTags.length, scriptEnds.length);
+// 기존 앱 스크립트 5개 + eunho-fx.js + eunho-fx-init. 마지막은 서비스 워커 등록이어야 한다.
+assert.equal(scriptTags.length, 7);
+const lastOpen = html.lastIndexOf('<script');
+const lastScript = html.slice(lastOpen, html.indexOf('</script>', lastOpen));
+assert.match(lastScript, /serviceWorker\.register\('sw\.js'\)/);
+assert.match(html, /vendor\/eunho-fx\.js/);
 
 const appStart = html.lastIndexOf('(async function main()');
 const appEnd = html.indexOf('</script>', appStart);

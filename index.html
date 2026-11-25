@@ -7277,6 +7277,29 @@ window.__api={setScreen,drawFlags,flagPick,spawnCoins,releaseCoins,spawnRice,rel
 }catch(e){ window.__fail((e&&e.message?e.message:e)+'\n'+(e&&e.stack?e.stack:'')); }
 })();
 </script>
+<!-- eunho-fx: libraries.dev 효과(Border beam·Liquid metal·Image generation·Gooey·Distortion waves·Magnetic UI·Thinking orbs)를 React 없이 옮긴 것. 원작 MIT © Jakub Antalik -->
+<link rel="stylesheet" href="vendor/eunho-fx.css?v=1">
+<style id="eunho-fx-page">:root{ --fx-metal-1:#8a5a3a; --fx-metal-2:#e8c9a0; --fx-metal-3:#c9a06a; --fx-metal-hi:#f3e2c4; --fx-beam-a:#c9a06a; --fx-beam-b:#f3e2c4; }
+img.sig.fx-metal{ display:block; }
+</style>
+<script src="vendor/eunho-fx.js?v=1"></script>
+<script id="eunho-fx-init">/* 휴대점상 — libraries.dev 효과 연결 (eunho-fx). 최소만: 서명 금빛, 점사 결과가 나오면 빛 한 바퀴. 3D·법식·확률·무구 배치·산통·엽전은 건드리지 않는다. 자석 효과는 끌기 조작과 겹치지 않게 넣지 않는다. */
+(function(){
+  if(!window.EunhoFX) return;
+  var FX = window.EunhoFX;
+  var sig = document.querySelector('img.sig');
+  if(sig) FX.metal(sig);
+  var ui = document.getElementById('ui');
+  if(!ui) return;
+  new MutationObserver(function(){
+    ui.querySelectorAll('.verdict.on').forEach(function(v){
+      if(v.__fxOnce) return;
+      v.__fxOnce = 1;
+      FX.beamOnce(v, 4200, 'pulse');
+    });
+  }).observe(ui, {childList:true, subtree:true, attributes:true, attributeFilter:['class']});
+})();
+</script>
 <script>
 if('serviceWorker' in navigator && location.protocol.startsWith('http')){
   navigator.serviceWorker.addEventListener('message',e=>{ if(e.data&&e.data.type==='hj-new-version'){ window.__hjNewVer=true; if(typeof window.__hjUpd==='function') window.__hjUpd(); } });
