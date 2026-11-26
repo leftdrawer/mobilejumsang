@@ -251,6 +251,12 @@ function runToss(kind, seed) {
 
   let coinPrev = clonePose(bodies);
   let rendered = null;
+  const trY = bodies.map(() => []);
+  const trT = bodies.map(() => []);
+  const trV = bodies.map(() => []);
+  const nearFloor = new Array(7).fill(0);
+  const contactAt = new Array(7).fill(-1);
+  const sleepAt = new Array(7).fill(-1);
   const restFor = new Array(7).fill(0);
   const atRest = new Array(7).fill(false);
   const restFramesSeen = new Array(7).fill(0);
@@ -279,6 +285,21 @@ function runToss(kind, seed) {
       world.step();
       for (const b of bodies) dissipateCoinBody(b);
       projectCoinBodies(bodies);
+      for (let i = 0; i < bodies.length; i++) {
+        const p = bodies[i].translation(), q = bodies[i].rotation(), v = bodies[i].linvel();
+        const ny = Math.abs(1 - 2 * (q.x * q.x + q.z * q.z));
+        const tilt = Math.acos(Math.min(1, ny));
+        const half = H_C * ny + R_C * Math.sqrt(Math.max(0, 1 - ny * ny));
+        const gap = p.y - half;
+        trY[i].push(p.y);
+        trT[i].push(tilt);
+        trV[i].push(v.y);
+        const asleep = bodies[i].gravityScale() < 0.5 || bodies[i].isSleeping();
+        if (gap < 0.001) nearFloor[i]++;
+        else nearFloor[i] = 0;
+        if (contactAt[i] < 0 && nearFloor[i] >= 8) contactAt[i] = trY[i].length - 1;
+        if (asleep && sleepAt[i] < 0) sleepAt[i] = trY[i].length;
+      }
       acc -= COIN_DT;
       t += COIN_DT;
     }
@@ -337,7 +358,7 @@ function runToss(kind, seed) {
     rendered = draw;
     frames++;
   }
-  const pose = bodies.map(b => ({ p: b.translation(), q: b.rotation(), ti: tiltDeg(b.rotation()), sp: speedOf(b) }));
+  const pose = bodies.map(b => ({ p: b.translation(), q: b.rotation(), ti: tiltDeg(b.rotation()), sp: speedOf(b), asleep: b.gravityScale() < 0.5 || b.isSleeping() }));
   let stacked = 0, leaning = 0, heads = 0;
   for (let i = 0; i < pose.length; i++) {
     if ((1 - 2 * (pose[i].q.x ** 2 + pose[i].q.z ** 2)) > 0) heads++;
@@ -368,6 +389,76 @@ function runToss(kind, seed) {
     comp[r] = (comp[r] || 0) + 1;
   }
   const allSevenOdd = Math.max(...Object.values(comp)) === pose.length;
+  const supOf = (q, dx, dy, dz) => {
+    const L = Math.hypot(dx, dy, dz) || 1;
+    const nx = dx / L, ny = dy / L, nz = dz / L;
+    const ax = 2 * (q.x * q.y - q.w * q.z), ay = 1 - 2 * (q.x * q.x + q.z * q.z), az = 2 * (q.y * q.z + q.w * q.x);
+    const c = Math.abs(nx * ax + ny * ay + nz * az);
+    const s = Math.sqrt(Math.max(0, 1 - Math.min(1, c * c)));
+    return H_C * c + R_C * s;
+  };
+  let maxTrayPen = 0, maxCoinPen = 0, tilt15 = 0, tilt15ok = 0, tilt15bad = 0;
+  for (let i = 0; i < pose.length; i++) {
+    if (!pose[i].asleep) continue;
+    const ny = nyOf(pose[i].q);
+    const half = H_C * ny + R_C * Math.sqrt(Math.max(0, 1 - Math.min(1, ny * ny)));
+    const trayPen = half - pose[i].p.y;
+    if (trayPen > maxTrayPen) maxTrayPen = trayPen;
+    let bestGap = -Infinity, worstPen = 0;
+    for (let j = 0; j < pose.length; j++) if (j !== i && pose[j].asleep) {
+      const dx = pose[i].p.x - pose[j].p.x, dy = pose[i].p.y - pose[j].p.y, dz = pose[i].p.z - pose[j].p.z;
+      const pen = supOf(pose[i].q, dx, dy, dz) + supOf(pose[j].q, -dx, -dy, -dz) - (Math.hypot(dx, dy, dz) || 1e-9);
+      if (pen > worstPen) worstPen = pen;
+      if (pen > bestGap) bestGap = pen;
+    }
+    if (worstPen > maxCoinPen) maxCoinPen = worstPen;
+    if (pose[i].ti > 15) {
+      tilt15++;
+      const supported = trayPen <= 0.00005 && worstPen <= 0.00005 && bestGap >= -0.0004;
+      if (supported) tilt15ok++;
+      else tilt15bad++;
+    }
+  }
+  const flipsOf = (arr) => {
+    let f = 0, prev = 0;
+    for (const v of arr) {
+      if (Math.abs(v) < 1e-5) continue;
+      const s = Math.sign(v);
+      if (prev && s !== prev) f++;
+      prev = s;
+    }
+    return f;
+  };
+  const hfRms = (arr) => {
+    if (arr.length < 24) return 0;
+    const w = 16;
+    let sum = 0, acc = 0, n = 0;
+    for (let i = 0; i < arr.length; i++) {
+      sum += arr[i];
+      if (i >= w) sum -= arr[i - w];
+      if (i >= w - 1) {
+        const d = arr[i] - sum / w;
+        acc += d * d;
+        n++;
+      }
+    }
+    return Math.sqrt(acc / Math.max(1, n));
+  };
+  let vyFlips = 0, tiltFlips = 0, hfY = 0, hfT = 0, chatterN = 0;
+  for (let i = 0; i < bodies.length; i++) {
+    const a = contactAt[i], b = sleepAt[i] < 0 ? trY[i].length : sleepAt[i];
+    if (a < 0 || b - a < 24) continue;
+    const ys = trY[i].slice(a, b);
+    const ts = trT[i].slice(a, b);
+    const vs = trV[i].slice(a, b);
+    const dT = [];
+    for (let k = 1; k < ts.length; k++) dT.push(ts[k] - ts[k - 1]);
+    vyFlips = Math.max(vyFlips, flipsOf(vs));
+    tiltFlips = Math.max(tiltFlips, flipsOf(dT));
+    hfY = Math.max(hfY, hfRms(ys));
+    hfT = Math.max(hfT, hfRms(ts));
+    chatterN++;
+  }
   let escaped = 0, minLow = Infinity;
   for (const o of pose) {
     const low = o.p.y - (H_C * nyOf(o.q) + R_C * Math.sqrt(Math.max(0, 1 - Math.min(1, nyOf(o.q) ** 2))));
@@ -387,6 +478,15 @@ function runToss(kind, seed) {
     stacked,
     leaning,
     allSevenOdd,
+    maxTrayPen,
+    maxCoinPen,
+    tilt15,
+    tilt15ok,
+    tilt15bad,
+    vyFlips,
+    tiltFlips,
+    hfY,
+    hfT,
     heads,
     escaped,
     minLow,
@@ -451,6 +551,15 @@ const report = {
   leaningThrows: rows.filter(r => r.leaning > 0).length,
   stackAllSevenOdd: rows.filter(r => r.kind === 'stack' && r.allSevenOdd).length,
   stackThrows: rows.filter(r => r.kind === 'stack').length,
+  maxTrayPen_mm: Math.max(...rows.map(r => r.maxTrayPen)) * 1000,
+  maxCoinPen_mm: Math.max(...rows.map(r => r.maxCoinPen)) * 1000,
+  tilt15: sum('tilt15'),
+  tilt15ok: sum('tilt15ok'),
+  tilt15bad: sum('tilt15bad'),
+  vyFlips: { p50: q(num('vyFlips'), 0.5), max: num('vyFlips').at(-1) },
+  tiltFlips: { p50: q(num('tiltFlips'), 0.5), max: num('tiltFlips').at(-1) },
+  hfY_mm: { p50: q(num('hfY'), 0.5) * 1000, max: num('hfY').at(-1) * 1000 },
+  hfTilt_deg: { p50: q(num('hfT'), 0.5) * 180 / Math.PI, max: num('hfT').at(-1) * 180 / Math.PI },
   slept_avg: sum('slept') / N,
   heads: sum('heads') / (N * 7),
   lowest_mm: Math.min(...rows.map(r => r.minLow)) * 1000,
@@ -468,6 +577,9 @@ const stackRows = rows.filter(r => r.kind === 'stack');
 const stackOdd = stackRows.filter(r => r.allSevenOdd).length;
 report.stackAllSevenOdd = stackOdd;
 if (stackRows.length && stackOdd < stackRows.length) fail.push(`일곱 포개 홀 ${stackOdd}/${stackRows.length}`);
+if (report.maxTrayPen_mm > 0.05) fail.push(`상판 파고듦 ${report.maxTrayPen_mm.toFixed(3)}mm`);
+if (report.maxCoinPen_mm > 0.05) fail.push(`닢 파고듦 ${report.maxCoinPen_mm.toFixed(3)}mm`);
+if (report.tilt15bad) fail.push(`받침 없는 기울기 ${report.tilt15bad}`);
 if (ASSERT && fail.length) {
   console.error('FAIL ' + fail.join('; '));
   process.exit(1);
