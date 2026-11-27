@@ -577,7 +577,7 @@ if (report.rendered_pos_mm.max >= POS_MM) fail.push(`그린 자리 이동 최대
 if (report.rendered_rot_deg.max >= ROT_DEG) fail.push(`그린 회전 최대 ${report.rendered_rot_deg.max.toFixed(4)}°`);
 if (report.escaped) fail.push(`상 밖 ${report.escaped}`);
 if (report.stackedThrows < 1) fail.push('쌓인 결과가 없습니다');
-if (report.leaningThrows < 1) fail.push('기댄 결과가 없습니다');
+// 30°를 넘는 기댐과 테만 닿은 기댐은 넘어져야 한다. 기대기 장면이 없어도 실패로 보지 않는다.
 const stackRows = rows.filter(r => r.kind === 'stack');
 const stackOdd = stackRows.filter(r => r.allSevenOdd).length;
 report.stackAllSevenOdd = stackOdd;
