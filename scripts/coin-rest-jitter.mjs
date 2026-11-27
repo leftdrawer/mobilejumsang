@@ -407,7 +407,12 @@ function runToss(kind, seed) {
     let bestGap = -Infinity, worstPen = 0;
     for (let j = 0; j < pose.length; j++) if (j !== i && pose[j].asleep) {
       const dx = pose[i].p.x - pose[j].p.x, dy = pose[i].p.y - pose[j].p.y, dz = pose[i].p.z - pose[j].p.z;
-      const pen = supOf(pose[i].q, dx, dy, dz) + supOf(pose[j].q, -dx, -dy, -dz) - (Math.hypot(dx, dy, dz) || 1e-9);
+      let pen = supOf(pose[i].q, dx, dy, dz) + supOf(pose[j].q, -dx, -dy, -dz) - (Math.hypot(dx, dy, dz) || 1e-9);
+      // 둘 다 거의 누웠고 그림자가 포개지면 면 사이 간격이 실제 파고듦이다.
+      // 중심을 잇는 대각선 지지점은 포개진 닢을 수 mm 박힌 것으로 오인한다.
+      if (pose[i].ti < 8 && pose[j].ti < 8 && Math.hypot(dx, dz) < 2 * R_C) {
+        pen = 2 * H_C - Math.abs(dy);
+      }
       if (pen > worstPen) worstPen = pen;
       if (pen > bestGap) bestGap = pen;
     }
