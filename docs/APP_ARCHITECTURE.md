@@ -47,7 +47,7 @@ index.html은 하나의 큰 파일이다(약 6,080줄, CRLF, BOM 없음). 줄 �
 
 ## 새 판 알림 (sw.js + 앱) — Kiro (684a464, d2f6074, f2b25b3)
 
-- **sw.js** — 캐시 우선 + 뒤에서 새로 받기. 문서 요청(`mode==='navigate'`)이고 캐시본이 있을 때만, 덮어쓰기 전 캐시본과 새로 받은 본의 SHA-256 을 비교한다. 순서는 `cache.put` → 꼬리(`?…`) 달린 항목 지우기 → 다를 때만 `postMessage({type:'hj-new-version'})`(`clients.matchAll({type:'window',includeUncontrolled:true})`). 처음 설치(캐시 없음)·오프라인·`!res.ok`·해시 같음이면 알리지 않는다. 캐시 이름은 판이 바뀔 때 올린다. 지금은 `hyudae-jeomsang-1.3.19`.
+- **sw.js** — 캐시 우선 + 뒤에서 새로 받기. 문서 요청(`mode==='navigate'`)이고 캐시본이 있을 때만, 덮어쓰기 전 캐시본과 새로 받은 본의 SHA-256 을 비교한다. 순서는 `cache.put` → 꼬리(`?…`) 달린 항목 지우기 → 다를 때만 `postMessage({type:'hj-new-version'})`(`clients.matchAll({type:'window',includeUncontrolled:true})`). 처음 설치(캐시 없음)·오프라인·`!res.ok`·해시 같음이면 알리지 않는다. 캐시 이름은 판이 바뀔 때 올린다. 지금은 `hyudae-jeomsang-1.3.20`.
 - **수신기** — 마지막 `<script>`의 `navigator.serviceWorker` message 수신기가 `window.__hjNewVer=true`를 세우고 `window.__hjUpd`(= `updNotice`)를 부른다. 앱이 아직 준비 전이면 깃발만 남는다.
 - **`updNotice()`** — 보일 조건: `__hjNewVer && __ready===true && screen==='home' && !edit` 이고 점 치는 중 아님(`mode==='fly'`·`rMode==='fly'`·`yjMode==='spin'`·`stMode==='shake'`·`flagBusy` 모두 아님). `#updnote`(`.toast.upd`, role=status, aria-live=polite) 하나를 만들어 두고 `hidden`·`.on`만 켜고 끈다. 안의 `<button type="button">` 글은 "새 판을 받았습니다. 짚으면 바꿉니다", 누르면 `location.reload()`. 저절로 새로고침하지 않는다.
 - 부르는 곳: buildUI 끝, `window.__ready=true` 직후, 깃발 연출 끝(`draw(); flagBusy=false; updNotice();`, 깃발만 연출 끝에 buildUI 를 안 부르기 때문).
